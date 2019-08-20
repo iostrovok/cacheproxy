@@ -14,7 +14,12 @@ import (
 	"testing"
 )
 
-type testSuite struct{}
+var StandaloneServerPort int = 35000
+
+type testSuite struct {
+	globalCtx    context.Context
+	globalCancel context.CancelFunc
+}
 
 var _ = Suite(&testSuite{})
 
@@ -24,6 +29,25 @@ var manager *Manager
 var manager2 *Manager
 var testHome string
 
+//Run once when the suite starts running.
+func (s *testSuite) SetUpSuite(c *C) {
+	s.globalCtx, s.globalCancel = context.WithCancel(context.Background())
+	cfg := baseCfg()
+	cfg.Port = StandaloneServerPort
+	Server(s.globalCtx, cfg)
+}
+
+//Run before each test or benchmark starts running.
+func (s *testSuite) SetUpTest(c *C) {}
+
+//Run after each test or benchmark runs.
+func (s *testSuite) TearDownTest(c *C) {}
+
+//Run once after all tests or benchmarks have finished running.
+func (s *testSuite) TearDownSuite(c *C) {
+	s.globalCancel()
+}
+
 func init() {
 	testHome = os.Getenv("TEST_SOURCE_PATH")
 	if testHome == "" {
@@ -32,6 +56,7 @@ func init() {
 
 	manager = NewManager(18900, 18900, baseCfg())
 	manager2 = NewManager(18900, 19000, baseCfg())
+
 }
 
 func baseCfg() *Config {
@@ -131,6 +156,28 @@ func (s *testSuite) TestWithManager2(c *C) {
 			c.Assert(len(body), Equals, 710)
 
 		}(c, fileName)
+	}
+
+	wg.Wait()
+}
+
+func (s *testSuite) TestWithStandaloneServer(c *C) {
+	wg := sync.WaitGroup{}
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(c *C) {
+			defer wg.Done()
+
+			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/beer/beer/OQ3ur2wBHqN_LZyul2Oh", StandaloneServerPort))
+			c.Assert(err, IsNil)
+
+			defer resp.Body.Close()
+			body, err := ioutil.ReadAll(resp.Body)
+
+			c.Assert(err, IsNil)
+			c.Assert(len(body), Equals, 710)
+		}(c)
 	}
 
 	wg.Wait()

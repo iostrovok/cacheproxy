@@ -34,10 +34,13 @@ func existsFile(name string) bool {
 }
 
 // readStoreFile reads zip file and returns store object
-func readStoreFile(cfg *Config) (map[string]*store, error) {
+func readStoreFile(cfg *Config, urlPath string) (map[string]*store, error) {
 
-	filename := cfg.File()
+	filename := cfg.File(urlPath)
 	out := map[string]*store{}
+
+	locker := blocker.FileLocker(filename)
+	defer locker.Unlock()
 
 	if !existsFile(filename) {
 		return out, nil
@@ -81,11 +84,14 @@ func readStoreFile(cfg *Config) (map[string]*store, error) {
 	return out, err
 }
 
-func updateStoreFile(cfg *Config, key string, data *store) error {
+func updateStoreFile(cfg *Config, urlPath, key string, data *store) error {
 
-	filename := cfg.File()
+	filename := cfg.File(urlPath)
 
-	out, err := readStoreFile(cfg)
+	locker := blocker.FileLocker(filename)
+	defer locker.Unlock()
+
+	out, err := readStoreFile(cfg, urlPath)
 	if err != nil {
 		return err
 	}
@@ -115,9 +121,9 @@ func updateStoreFile(cfg *Config, key string, data *store) error {
 	return zw.Close()
 }
 
-func findKey(cfg *Config, key string) (*store, error, bool) {
+func findKey(cfg *Config, urlPath, key string) (*store, error, bool) {
 
-	data, err := readStoreFile(cfg)
+	data, err := readStoreFile( cfg, urlPath)
 	if err != nil {
 		return nil, err, false
 	}
@@ -161,9 +167,6 @@ func logPrintf(cfg *Config, tmpl string, data ...interface{}) {
 
 func handler(cfg *Config, w http.ResponseWriter, req *http.Request) {
 
-	locker := blocker.FileLocker(cfg.File())
-	defer locker.Unlock()
-
 	key, requestDump, err := cacheKey(cfg, req)
 	if err != nil {
 		logError(cfg, err)
@@ -177,7 +180,7 @@ func handler(cfg *Config, w http.ResponseWriter, req *http.Request) {
 	logPrintf(cfg, "Try to get %s", req.URL.String())
 
 	if !cfg.ForceSave {
-		store, err, find := findKey(cfg, key)
+		store, err, find := findKey(cfg, req.URL.String(), key)
 		if err != nil {
 			logError(cfg, err)
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
@@ -214,7 +217,7 @@ func handler(cfg *Config, w http.ResponseWriter, req *http.Request) {
 		StatusCode:     resp.StatusCode,
 	}
 
-	if err := updateStoreFile(cfg, key, storeData); err != nil {
+	if err := updateStoreFile(cfg, req.URL.String(), key, storeData); err != nil {
 		logError(cfg, err)
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return

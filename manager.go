@@ -3,6 +3,7 @@ package cacheproxy
 import (
 	"context"
 	"path/filepath"
+	"regexp"
 	"sync"
 )
 
@@ -15,6 +16,8 @@ type Manager struct {
 	PortTo   int
 	useHttps bool
 }
+
+var re *regexp.Regexp = regexp.MustCompile(`[^-_a-zA-Z0-9]+`)
 
 func NewManager(portFrom, portTo int, cfg *Config) *Manager {
 	return &Manager{
@@ -65,8 +68,15 @@ type Config struct {
 	FileName         string
 	Verbose          bool
 	ForceSave        bool
+	DynamyFileName   bool
 }
 
-func (cfg Config) File() string {
-	return filepath.Join(cfg.StorePath, cfg.FileName)
+func (cfg Config) File(urlPath string) string {
+
+	if !cfg.DynamyFileName && cfg.FileName != "" {
+		return filepath.Join(cfg.StorePath, cfg.FileName)
+	}
+	
+	urlPath = re.ReplaceAllString(urlPath, "") + ".zip"
+	return filepath.Join(cfg.StorePath, urlPath)
 }
