@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	. "gopkg.in/check.v1"
+
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+
+	. "github.com/iostrovok/check"
 )
 
 var StandaloneServerPort int = 35000
