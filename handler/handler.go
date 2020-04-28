@@ -23,7 +23,6 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 
 	key, requestDump, err := cacheKey(req)
 
-	fmt.Printf("\nkey: %s,\nrequestDump: %s,\nerr: %+v\n\n\n", key, string(requestDump), err)
 	if err != nil {
 		logError(cfg, err)
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
