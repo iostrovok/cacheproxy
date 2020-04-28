@@ -172,8 +172,12 @@ func (s *SQL) setTimeRead(args string) error {
 }
 
 func (s *SQL) DeleteOld() (int64, error) {
+	return s.DeleteOldByTime(s.timeForCut)
+}
+
+func (s *SQL) DeleteOldByTime(timeForCut int) (int64, error) {
 	count := int64(0)
-	res, err := s.execTx("DELETE from main WHERE last_date < ?", s.timeForCut)
+	res, err := s.execTx("DELETE from main WHERE last_date < ?", timeForCut)
 	if err == nil {
 		count, err = res.RowsAffected()
 	}
