@@ -19,6 +19,7 @@ type Config struct {
 	ForceSave        bool
 	DynamoFileName   bool
 	URL              *url.URL
+	DeleteOldFromNow bool
 }
 
 func (cfg *Config) Init() (err error) {

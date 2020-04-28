@@ -79,6 +79,7 @@ func (p *Pull) DeleteOldFromNow() error {
 	p.deleteOld = true
 
 	for _, c := range p.conns {
+		c.UpdateTimeRead(true)
 		if err := c.fixTimeForCut(); err != nil {
 			return err
 		}
@@ -143,6 +144,7 @@ func (p *Pull) Add(fileName string) (*SQL, error) {
 		p.conns[fileName] = c
 	}
 
+	c.UpdateTimeRead(p.deleteOld)
 	if p.deleteOld {
 		err = c.fixTimeForCut()
 	}
