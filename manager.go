@@ -2,25 +2,23 @@ package cacheproxy
 
 import (
 	"context"
-	"net/url"
-	"path/filepath"
-	"regexp"
 	"sync"
+
+	"github.com/iostrovok/cacheproxy/config"
+	"github.com/iostrovok/cacheproxy/handler"
 )
 
 type Manager struct {
 	mu sync.RWMutex
 
-	protoCfg Config
+	protoCfg config.Config
 	LastPort int
 	PortFrom int
 	PortTo   int
 	AllPorts []int
 }
 
-var re *regexp.Regexp = regexp.MustCompile(`[^-_a-zA-Z0-9]+`)
-
-func NewManager(portFrom, portTo int, cfg *Config) *Manager {
+func NewManager(portFrom, portTo int, cfg *config.Config) *Manager {
 
 	if portTo-portFrom < 0 {
 		portTo = portFrom
@@ -40,7 +38,7 @@ func NewManager(portFrom, portTo int, cfg *Config) *Manager {
 	}
 }
 
-func (m *Manager) SetCfg(cfg *Config) {
+func (m *Manager) SetCfg(cfg *config.Config) {
 	m.protoCfg = *cfg
 }
 
@@ -51,7 +49,7 @@ func (m *Manager) RunSrv(ctx context.Context, fileName string) (int, error) {
 	m.LastPort = (m.LastPort + 1) % len(m.AllPorts)
 	m.mu.Unlock()
 
-	copyCfg := &Config{
+	copyCfg := &config.Config{
 		Scheme:    m.protoCfg.Scheme,
 		Host:      m.protoCfg.Host,
 		PemPath:   m.protoCfg.PemPath,
@@ -63,38 +61,10 @@ func (m *Manager) RunSrv(ctx context.Context, fileName string) (int, error) {
 		Port:      nextPort,
 	}
 
-	err := run(ctx, copyCfg)
+	err := handler.Start(ctx, copyCfg)
 	if err != nil {
 		return 0, err
 	}
 
 	return nextPort, nil
-}
-
-type Config struct {
-	Host             string
-	Scheme           string
-	Port             int
-	PemPath, KeyPath string
-	StorePath        string
-	FileName         string
-	Verbose          bool
-	ForceSave        bool
-	DynamyFileName   bool
-	URL              *url.URL
-}
-
-func (cfg *Config) init() (err error) {
-	cfg.URL, err = url.Parse(cfg.Host)
-	return
-}
-
-func (cfg *Config) File(urlPath string) string {
-
-	if !cfg.DynamyFileName && cfg.FileName != "" {
-		return filepath.Join(cfg.StorePath, cfg.FileName)
-	}
-
-	urlPath = re.ReplaceAllString(urlPath, "") + ".zip"
-	return filepath.Join(cfg.StorePath, urlPath)
 }
