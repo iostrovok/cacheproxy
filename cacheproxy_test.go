@@ -125,7 +125,7 @@ func (s *testSuite) TestPost(c *C) {
 	cfg := baseCfg()
 	cfg.Host = ts.URL
 	cfg.Port = 19200
-	cfg.FileName = "my_test_2.zip"
+	cfg.FileName = "my_test_2.db"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -156,7 +156,7 @@ func (s *testSuite) TestWithManager(c *C) {
 	c.Skip("TestPost")
 
 	wg := sync.WaitGroup{}
-	for _, fileName := range []string{"test_0.zip", "test_1.zip", "test_2.zip", "test_3.zip", "test_0.zip", "test_1.zip", "test_2.zip", "test_3.zip"} {
+	for _, fileName := range []string{"test_0.db", "test_1.db", "test_2.db", "test_3.db", "test_0.db", "test_1.db", "test_2.db", "test_3.db"} {
 		wg.Add(1)
 		go func(c *C, fileName string) {
 			defer wg.Done()
@@ -186,8 +186,7 @@ func (s *testSuite) TestWithManager2(c *C) {
 	c.Skip("TestPost")
 
 	wg := sync.WaitGroup{}
-	//for _, fileName := range []string{"test_10.zip", "test_10.zip", "test_11.zip", "test_11.zip", "test_12.zip", "test_13.zip", "test_12.zip", "test_13.zip"} {
-	for _, fileName := range []string{"test_10.zip"} {
+	for _, fileName := range []string{"test_10.db"} {
 		wg.Add(1)
 		go func(c *C, fileName string) {
 			defer wg.Done()

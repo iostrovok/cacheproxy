@@ -32,6 +32,6 @@ func (cfg *Config) File(urlPath string) string {
 		return filepath.Join(cfg.StorePath, cfg.FileName)
 	}
 
-	urlPath = re.ReplaceAllString(urlPath, "") + ".zip"
+	urlPath = re.ReplaceAllString(urlPath, "") + ".db"
 	return filepath.Join(cfg.StorePath, urlPath)
 }
