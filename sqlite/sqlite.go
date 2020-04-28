@@ -2,10 +2,9 @@ package sqlite
 
 import (
 	"database/sql"
+	_ "github.com/mattn/go-sqlite3"
 	"os"
 	"sync"
-
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/iostrovok/cacheproxy/store"
 )
@@ -19,11 +18,12 @@ func init() {
 }
 
 type SQL struct {
-	mx          sync.RWMutex
-	fileName    string
-	db          *sql.DB
-	testCounter int
-	timeForCut  int
+	mx             sync.RWMutex
+	fileName       string
+	db             *sql.DB
+	testCounter    int
+	timeForCut     int
+	updateTimeRead bool
 }
 
 // Exists reports whether the named file or directory exists.
@@ -64,6 +64,10 @@ func conn(fileName string) (*SQL, error) {
 
 	err := c.Open()
 	return c, err
+}
+
+func (s *SQL) UpdateTimeRead(updateTimeRead bool) {
+	s.updateTimeRead = updateTimeRead
 }
 
 func (s *SQL) Close() error {
@@ -156,7 +160,7 @@ func (s *SQL) Select(args string) (*store.StoreUnit, error) {
 		return nil, err
 	}
 
-	if len(body) > 0 {
+	if s.updateTimeRead && len(body) > 0 {
 		if err := s.setTimeRead(args); err != nil {
 			return nil, err
 		}
