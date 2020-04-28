@@ -1,10 +1,12 @@
 package sqlite
 
 import (
-	. "github.com/iostrovok/check"
 	"net/http"
 	"os"
 	"sync"
+	"time"
+
+	. "github.com/iostrovok/check"
 
 	"github.com/iostrovok/cacheproxy/store"
 )
@@ -81,6 +83,45 @@ func (s *testSuite) TestSQL_Pull_Multi(c *C) {
 		}()
 	}
 	wg.Wait()
+	c.Assert(p.Close(), IsNil)
+}
+
+// test syntax only
+func (s *testSuite) TestSQL_Pull_Multi_DeleteOld(c *C) {
+
+	countFiles := 7
+	files := make([]string, countFiles)
+	for i := 0; i < countFiles; i++ {
+		files[i] = tmpFile(c)
+	}
+
+	defer func() {
+		for _, f := range files {
+			os.Remove(f)
+		}
+	}()
+
+	keys := []string{"TestSQL_Pull_Global-1", "TestSQL_Pull_Global-2", "TestSQL_Pull_Global-3", "TestSQL_Pull_Global-4", "TestSQL_Pull_Global-5"}
+
+	wg := sync.WaitGroup{}
+	p := New()
+
+	for i := 0; i < 6*countFiles; i++ {
+		wg.Add(1)
+		go func(file, key string) {
+			defer wg.Done()
+			raceSubTest(c, p, file, key)
+		}(files[i%len(files)], keys[i%len(keys)])
+	}
+	wg.Wait()
+
+	time.Sleep(1 * time.Second)
+
+	c.Assert(p.DeleteOldFromNow(), IsNil)
+	count, err := p.DeleteOld()
+	c.Assert(err, IsNil)
+	c.Assert(int(count), Equals, countFiles*len(keys))
+
 	c.Assert(p.Close(), IsNil)
 }
 

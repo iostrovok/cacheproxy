@@ -2,8 +2,9 @@ package sqlite
 
 import (
 	"context"
-	"github.com/iostrovok/cacheproxy/store"
 	"sync"
+
+	"github.com/iostrovok/cacheproxy/store"
 )
 
 var globalPullMutex sync.Mutex
@@ -13,8 +14,9 @@ func init() {
 }
 
 type Pull struct {
-	mx    sync.RWMutex
-	conns map[string]*SQL
+	mx        sync.RWMutex
+	conns     map[string]*SQL
+	deleteOld bool
 }
 
 var pull *Pull
@@ -29,6 +31,7 @@ func New(ctx ...context.Context) *Pull {
 	if len(ctx) > 0 {
 		go func(ctx context.Context) {
 			<-ctx.Done()
+			out.DeleteOld()
 			out.Close()
 		}(ctx[0])
 	}
@@ -66,7 +69,22 @@ func Select(fileName, args string) (*store.StoreUnit, error) {
 	return pull.Select(fileName, args)
 }
 
+func DeleteOldFromNow() error {
+	return pull.DeleteOldFromNow()
+}
+
 // -----------------------------------
+
+func (p *Pull) DeleteOldFromNow() error {
+	p.deleteOld = true
+
+	for _, c := range p.conns {
+		if err := c.fixTimeForCut(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func (p *Pull) Close() error {
 	p.mx.Lock()
@@ -86,6 +104,31 @@ func (p *Pull) Close() error {
 	return nil
 }
 
+func (p *Pull) DeleteOld() (int64, error) {
+	p.mx.Lock()
+	defer p.mx.Unlock()
+
+	if !p.deleteOld {
+		return 0, nil
+	}
+
+	total := int64(0)
+
+	for _, c := range p.conns {
+		if c == nil {
+			continue
+		}
+
+		deleted, err := c.DeleteOld()
+		if err != nil {
+			return 0, err
+		}
+		total += deleted
+	}
+
+	return total, nil
+}
+
 // Add creates new connection and adds to pull
 func (p *Pull) Add(fileName string) (*SQL, error) {
 	p.mx.Lock()
@@ -98,6 +141,10 @@ func (p *Pull) Add(fileName string) (*SQL, error) {
 	c, err := conn(fileName)
 	if err == nil {
 		p.conns[fileName] = c
+	}
+
+	if p.deleteOld {
+		err = c.fixTimeForCut()
 	}
 
 	return c, err

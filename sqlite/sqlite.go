@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"database/sql"
-	"fmt"
 	"os"
 	"sync"
 
@@ -24,6 +23,7 @@ type SQL struct {
 	fileName    string
 	db          *sql.DB
 	testCounter int
+	timeForCut  int
 }
 
 // Exists reports whether the named file or directory exists.
@@ -90,8 +90,6 @@ func (s *SQL) exec(command string, args ...interface{}) error {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
-	fmt.Printf("exec: testCounter: %d, %s\n", s.testCounter, s.fileName)
-
 	statement, err := s.db.Prepare(command)
 	if err == nil {
 		_, err = statement.Exec(args...)
@@ -101,21 +99,18 @@ func (s *SQL) exec(command string, args ...interface{}) error {
 }
 
 // execTx executes one command with transaction
-func (s *SQL) execTx(command string, args ...interface{}) error {
+func (s *SQL) execTx(command string, args ...interface{}) (sql.Result, error) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
-	fmt.Printf("execTx: testCounter: %d, %s\n", s.testCounter, s.fileName)
-
 	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer tx.Commit()
 
-	_, err = tx.Exec(command, args...)
-	return err
+	return tx.Exec(command, args...)
 }
 
 func (s *SQL) CreateTable() error {
@@ -123,11 +118,11 @@ func (s *SQL) CreateTable() error {
 	dropTableSQL := "DROP TABLE main"
 	indexSQL := "CREATE INDEX idx_last_date ON main (last_date)"
 
-	if err := s.execTx(createTableSQL); err != nil {
+	if _, err := s.execTx(createTableSQL); err != nil {
 		return err
 	}
 
-	if err := s.execTx(indexSQL); err != nil {
+	if _, err := s.execTx(indexSQL); err != nil {
 		s.execTx(dropTableSQL) // ignore error
 		return err
 	}
@@ -146,7 +141,8 @@ func (s *SQL) Upsert(args string, unit *store.StoreUnit) error {
 	if err != nil {
 		return err
 	}
-	return s.execTx(insertSQL, args, body)
+	_, err = s.execTx(insertSQL, args, body)
+	return err
 }
 
 func (s *SQL) Select(args string) (*store.StoreUnit, error) {
@@ -160,5 +156,34 @@ func (s *SQL) Select(args string) (*store.StoreUnit, error) {
 		return nil, err
 	}
 
+	if len(body) > 0 {
+		if err := s.setTimeRead(args); err != nil {
+			return nil, err
+		}
+	}
+
 	return store.FromZip(body)
+}
+
+func (s *SQL) setTimeRead(args string) error {
+	setTimeSQL := `UPDATE main SET last_date = strftime('%s','now') WHERE args = ?`
+	_, err := s.execTx(setTimeSQL, args)
+	return err
+}
+
+func (s *SQL) DeleteOld() (int64, error) {
+	count := int64(0)
+	res, err := s.execTx("DELETE from main WHERE last_date < ?", s.timeForCut)
+	if err == nil {
+		count, err = res.RowsAffected()
+	}
+	return count, err
+}
+
+func (s *SQL) fixTimeForCut() error {
+	s.mx.RLock()
+	row := s.db.QueryRow(`SELECT strftime('%s','now') as t`)
+	s.mx.RUnlock()
+
+	return row.Scan(&s.timeForCut)
 }
