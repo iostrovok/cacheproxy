@@ -9,16 +9,19 @@ DIR:=FILE_DIR=$(CURDIR)/testfiles TEST_SOURCE_PATH=$(CURDIR)
 ## default:
 all: test
 
-test:
-	@echo "======================================================================"
-	@echo "Run race test"
-	@$(DIR) GODEBUG=gocacheverify=1 go test -cover -race ./...
 
-test-init: clean test
+test: clean
+	@echo "======================================================================"
+	@echo "Run race test for ./"
+	cd $(CURDIR)/ && $(DIR) $(GODEBUG) go test -coverprofile=$(CURDIR)/coverage.main.out -race ./...
+	go tool cover -html=$(CURDIR)/coverage.main.out -o $(CURDIR)/coverage.main.html
+	@rm -f $(CURDIR)/coverage.main.out
+	@rm -f  ./cassettes/*
 
 clean:
 	@echo "======================================================================"
 	@echo "Clean old tests data..."
+	@rm -f  ./coverage.*
 	@rm -f  ./cassettes/*
 
 fmt:

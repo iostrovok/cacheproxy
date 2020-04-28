@@ -10,6 +10,7 @@
 
 # Test binary, build with `go test -c`
 *.test
+coverage.*
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
@@ -36,16 +37,9 @@ _cgo_export.*
 
 _testmain.go
 
+go.sum
 vendor/
 /.vscode/
 /.idea/
 /debug.test
-/generator
-/cluster-test/cluster-test
-/cluster-test/*.log
-/cluster-test/es-chaos-monkey
-/go.sum
-/spec
-/tmp
-/test
-/CHANGELOG-3.0.html
+

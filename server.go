@@ -2,11 +2,14 @@ package cacheproxy
 
 import (
 	"context"
+
+	"github.com/iostrovok/cacheproxy/config"
+	"github.com/iostrovok/cacheproxy/handler"
 )
 
-func Server(ctx context.Context, cfg *Config) error {
+func Server(ctx context.Context, cfg *config.Config) error {
 	if cfg.FileName == "" {
-		cfg.DynamyFileName = true
+		cfg.DynamoFileName = true
 	}
-	return run(ctx, cfg)
+	return handler.Start(ctx, cfg)
 }
