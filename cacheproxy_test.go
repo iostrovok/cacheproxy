@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/iostrovok/cacheproxy/handler"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -17,9 +16,10 @@ import (
 	. "github.com/iostrovok/check"
 
 	"github.com/iostrovok/cacheproxy/config"
+	"github.com/iostrovok/cacheproxy/handler"
 )
 
-var StandaloneServerPort int = 35000
+var StandaloneServerPort = 35000
 
 type testSuite struct {
 	globalCtx    context.Context
