@@ -2,9 +2,10 @@ package sqlite
 
 import (
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
 	"os"
 	"sync"
+
+	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/iostrovok/cacheproxy/store"
 )
@@ -136,10 +137,18 @@ func (s *SQL) CreateTable() error {
 
 // We are passing db reference connection from main to our method with other parameters
 func (s *SQL) Upsert(args string, unit *store.StoreUnit) error {
-	insertSQL := `INSERT INTO main(args, body, last_date)
-  VALUES(?, ?, strftime('%s','now'))
-  ON CONFLICT(args) DO 
-  UPDATE SET body=excluded.body, last_date = strftime('%s','now') WHERE excluded.args = main.args`
+
+	// don't update time if it's not necessary
+	insertSQL := `INSERT INTO main(args, body, last_date) VALUES(?, ?, strftime('%s','now'))
+		ON CONFLICT(args)
+		DO UPDATE SET body=excluded.body, last_date = strftime('%s','now')
+		WHERE excluded.args = main.args AND excluded.body <> main.body`
+
+	if s.updateTimeRead {
+		insertSQL = `INSERT INTO main(args, body, last_date) VALUES(?, ?, strftime('%s','now'))
+			ON CONFLICT(args)
+			DO UPDATE SET body=excluded.body, last_date = strftime('%s','now') WHERE excluded.args = main.args`
+	}
 
 	body, err := unit.ToZip()
 	if err != nil {
@@ -160,7 +169,7 @@ func (s *SQL) Select(args string) (*store.StoreUnit, error) {
 		return nil, err
 	}
 
-	if s.updateTimeRead && len(body) > 0 {
+	if s.updateTimeRead {
 		if err := s.setTimeRead(args); err != nil {
 			return nil, err
 		}
@@ -180,6 +189,7 @@ func (s *SQL) DeleteOld() (int64, error) {
 }
 
 func (s *SQL) DeleteOldByTime(timeForCut int) (int64, error) {
+
 	count := int64(0)
 	res, err := s.execTx("DELETE from main WHERE last_date < ?", timeForCut)
 	if err == nil {

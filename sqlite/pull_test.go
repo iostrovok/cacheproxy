@@ -100,8 +100,9 @@ func (s *testSuite) TestSQL_Pull_Multi_DeleteOld(c *C) {
 			os.Remove(f)
 		}
 	}()
-
 	keys := []string{"TestSQL_Pull_Global-1", "TestSQL_Pull_Global-2", "TestSQL_Pull_Global-3", "TestSQL_Pull_Global-4", "TestSQL_Pull_Global-5"}
+	keys2 := []string{"2-TestSQL_Pull_Global-1", "2-TestSQL_Pull_Global-2", "2-TestSQL_Pull_Global-3",
+		"2-TestSQL_Pull_Global-4", "2-TestSQL_Pull_Global-5", "2-TestSQL_Pull_Global-6"}
 
 	wg := sync.WaitGroup{}
 	p := New()
@@ -115,9 +116,19 @@ func (s *testSuite) TestSQL_Pull_Multi_DeleteOld(c *C) {
 	}
 	wg.Wait()
 
+	c.Assert(p.DeleteOldFromNow(), IsNil)
 	time.Sleep(1 * time.Second)
 
-	c.Assert(p.DeleteOldFromNow(), IsNil)
+	wg = sync.WaitGroup{}
+	for i := 0; i < 6*countFiles; i++ {
+		wg.Add(1)
+		go func(file, key string) {
+			defer wg.Done()
+			raceSubTest(c, p, file, key)
+		}(files[i%len(files)], keys2[i%len(keys)])
+	}
+	wg.Wait()
+
 	count, err := p.DeleteOld()
 	c.Assert(err, IsNil)
 	c.Assert(int(count), Equals, countFiles*len(keys))
