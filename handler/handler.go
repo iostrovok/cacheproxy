@@ -68,7 +68,7 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 	defer resp.Body.Close()
 
 	// >>>>>>>>> store for next using
-	storeData := &store.StoreUnit{
+	storeData := &store.Item{
 		Request:        requestDump,
 		ResponseBody:   streamToByte(resp.Body),
 		ResponseHeader: resp.Header,

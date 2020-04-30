@@ -18,6 +18,19 @@ func init() {
 	globalConnMutex = sync.RWMutex{}
 }
 
+//
+type Record struct {
+	// Args is unique key: MD5 hash from url + request
+	Args string `json:"args"`
+
+	// LastDate is unix time creating (or last reading) of record.
+	// Using for cleanup files from old records.
+	LastDate int64 `json:"last_date"`
+
+	// See github.com/iostrovok/cacheproxy/store
+	Body *store.Item `json:"body"`
+}
+
 type SQL struct {
 	mx             sync.RWMutex
 	fileName       string
@@ -136,7 +149,7 @@ func (s *SQL) CreateTable() error {
 }
 
 // We are passing db reference connection from main to our method with other parameters
-func (s *SQL) Upsert(args string, unit *store.StoreUnit) error {
+func (s *SQL) Upsert(args string, unit *store.Item) error {
 
 	// don't update time if it's not necessary
 	insertSQL := `INSERT INTO main(args, body, last_date) VALUES(?, ?, strftime('%s','now'))
@@ -158,7 +171,7 @@ func (s *SQL) Upsert(args string, unit *store.StoreUnit) error {
 	return err
 }
 
-func (s *SQL) Select(args string) (*store.StoreUnit, error) {
+func (s *SQL) Select(args string) (*store.Item, error) {
 	s.mx.RLock()
 	row := s.db.QueryRow(`SELECT body FROM main WHERE args = ?`, args)
 	s.mx.RUnlock()
@@ -176,6 +189,33 @@ func (s *SQL) Select(args string) (*store.StoreUnit, error) {
 	}
 
 	return store.FromZip(body)
+}
+
+// SelectAll return all rows sorted by args
+func (s *SQL) SelectAll() ([]*Record, error) {
+	s.mx.RLock()
+	row, err := s.db.Query("SELECT args, last_date, body FROM main ORDER BY args")
+	if err != nil {
+		return nil, err
+	}
+	defer row.Close()
+	s.mx.RUnlock()
+
+	out := make([]*Record, 0)
+	for row.Next() {
+		rec := Record{}
+		body := make([]byte, 0)
+		if err := row.Scan(&rec.Args, &rec.LastDate, &body); err != nil {
+			return nil, err
+		}
+
+		if rec.Body, err = store.FromZip(body, true); err != nil {
+			return nil, err
+		}
+
+		out = append(out, &rec)
+	}
+	return out, nil
 }
 
 func (s *SQL) setTimeRead(args string) error {

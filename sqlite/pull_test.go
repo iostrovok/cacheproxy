@@ -39,7 +39,7 @@ func (s *testSuite) TestSQL_Pull_2(c *C) {
 	fileName := tmpFile(c)
 	defer os.Remove(fileName)
 
-	unit := &store.StoreUnit{
+	unit := &store.Item{
 		Request:      []byte{100},
 		ResponseBody: []byte{101},
 		ResponseHeader: http.Header{
@@ -137,7 +137,7 @@ func (s *testSuite) TestSQL_Pull_Multi_DeleteOld(c *C) {
 }
 
 func raceSubTest(c *C, p *Pull, fileName, key string) {
-	unit := &store.StoreUnit{
+	unit := &store.Item{
 		Request:      []byte{100},
 		ResponseBody: []byte{101},
 		ResponseHeader: http.Header{
@@ -188,7 +188,7 @@ func (s *testSuite) TestSQL_Pull_Global(c *C) {
 }
 
 func globalRaceSubTest(c *C, fileName, key string) {
-	unit := &store.StoreUnit{
+	unit := &store.Item{
 		Request:      []byte{100},
 		ResponseBody: []byte{101},
 		ResponseHeader: http.Header{

@@ -19,6 +19,7 @@ type Pull struct {
 	deleteOld bool
 }
 
+// global variable
 var pull *Pull
 
 func New(ctx ...context.Context) *Pull {
@@ -61,14 +62,17 @@ func Get(fileName string) (*SQL, error) {
 	return pull.Get(fileName)
 }
 
-func Upsert(fileName, args string, unit *store.StoreUnit) error {
+func Upsert(fileName, args string, unit *store.Item) error {
 	return pull.Upsert(fileName, args, unit)
 }
 
-func Select(fileName, args string) (*store.StoreUnit, error) {
+func Select(fileName, args string) (*store.Item, error) {
 	return pull.Select(fileName, args)
 }
 
+// DeleteOldFromNow
+// 1) It sets up time to delete rows which are not updated since this moment.
+// 2) Event for to delete is call of Close()
 func DeleteOldFromNow() error {
 	return pull.DeleteOldFromNow()
 }
@@ -166,7 +170,7 @@ func (p *Pull) Get(fileName string) (*SQL, error) {
 }
 
 // Upsert just inserts or update one record
-func (p *Pull) Upsert(fileName, args string, unit *store.StoreUnit) error {
+func (p *Pull) Upsert(fileName, args string, unit *store.Item) error {
 	c, err := p.Get(fileName)
 	if err != nil {
 		return err
@@ -174,7 +178,7 @@ func (p *Pull) Upsert(fileName, args string, unit *store.StoreUnit) error {
 	return c.Upsert(args, unit)
 }
 
-func (p *Pull) Select(fileName, args string) (*store.StoreUnit, error) {
+func (p *Pull) Select(fileName, args string) (*store.Item, error) {
 	c, err := p.Get(fileName)
 	if err != nil {
 		return nil, err
