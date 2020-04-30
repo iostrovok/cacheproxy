@@ -11,5 +11,7 @@ install:
 script:
   - export GOMAXPROCS=4
   - export GORACE=halt_on_error=1
-  - make test
-  - make clean
+  - rm -f  ./cassettes/*
+  - go test -race ./...
+  - rm -f ./cassettes/*
+
