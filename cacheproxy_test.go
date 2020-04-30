@@ -66,8 +66,10 @@ func init() {
 
 func baseCfg() *config.Config {
 	return &config.Config{
-		Host:      "http://127.0.0.1:9200", // local elastisearch
-		Scheme:    "http",                  // http OR https
+		// host will be set up later
+		//Host:      "http://127.0.0.1:9200", // local elastisearch
+
+		Scheme:    "http", // http OR https
 		StorePath: filepath.Join(testHome, "cassettes"),
 		Verbose:   true,
 		ForceSave: false,
@@ -75,6 +77,7 @@ func baseCfg() *config.Config {
 }
 
 func (s *testSuite) TestGet(c *C) {
+	c.Skip("TestPost")
 
 	counter := 0
 
