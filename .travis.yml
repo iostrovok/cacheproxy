@@ -12,6 +12,6 @@ script:
   - export GOMAXPROCS=4
   - export GORACE=halt_on_error=1
   - rm -f  ./cassettes/*
-  - go test -race ./...
+  - make test-travis
   - rm -f ./cassettes/*
 

@@ -1,5 +1,5 @@
 CURDIR := $(shell pwd)
-DIR:=FILE_DIR=$(CURDIR)/testfiles TEST_SOURCE_PATH=$(CURDIR)
+DIR:=TEST_SOURCE_PATH=$(CURDIR)
 
 
 ##
@@ -9,6 +9,8 @@ DIR:=FILE_DIR=$(CURDIR)/testfiles TEST_SOURCE_PATH=$(CURDIR)
 ## default:
 all: test
 
+test-travis:
+	$(DIR) $(GODEBUG) go test  -race ./...
 
 test: clean
 	@echo "======================================================================"
@@ -32,7 +34,6 @@ fmt:
 mod:
 	@echo "======================================================================"
 	@echo "Run MOD"
-	@go mod verify
 	@go mod tidy
 	@go mod vendor
 	@go mod download
