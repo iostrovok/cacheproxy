@@ -10,12 +10,12 @@ DIR:=TEST_SOURCE_PATH=$(CURDIR)
 all: test
 
 test-travis:
-	$(DIR) $(GODEBUG) go test  -race ./...
+	 go test  -race ./...
 
 test: clean
 	@echo "======================================================================"
 	@echo "Run race test for ./"
-	cd $(CURDIR)/ && $(DIR) $(GODEBUG) go test -coverprofile=$(CURDIR)/coverage.main.out -race ./...
+	cd $(CURDIR)/ && go test -coverprofile=$(CURDIR)/coverage.main.out -race ./...
 	go tool cover -html=$(CURDIR)/coverage.main.out -o $(CURDIR)/coverage.main.html
 	@rm -f $(CURDIR)/coverage.main.out
 	@rm -f  ./cassettes/*

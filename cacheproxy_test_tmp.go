@@ -5,10 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -41,6 +39,9 @@ func (s *testSuite) SetUpSuite(c *C) {
 	cfg.Port = StandaloneServerPort
 	err := Server(s.globalCtx, cfg)
 	c.Assert(err, IsNil)
+
+	manager = NewManager(18801, 18899, baseCfg())
+	manager2 = NewManager(19001, 19001, baseCfg())
 }
 
 //Run before each test or benchmark starts running.
@@ -52,16 +53,6 @@ func (s *testSuite) TearDownTest(c *C) {}
 //Run once after all tests or benchmarks have finished running.
 func (s *testSuite) TearDownSuite(c *C) {
 	s.globalCancel()
-}
-
-func init() {
-	testHome = os.Getenv("TEST_SOURCE_PATH")
-	if testHome == "" {
-		log.Fatal("Please setup the TEST_SOURCE_PATH")
-	}
-
-	manager = NewManager(18801, 18899, baseCfg())
-	manager2 = NewManager(19001, 19001, baseCfg())
 }
 
 func baseCfg() *config.Config {
