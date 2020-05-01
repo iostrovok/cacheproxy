@@ -1,4 +1,4 @@
-# CacheProxy [![Build Status](https://travis-ci.org/github/iostrovok/cacheproxy.svg?branch=master)](https://travis-ci.org/github/iostrovok/cacheproxy) [![GoDoc](https://travis-ci.org/github/iostrovok/cacheproxy?status.svg)](https://travis-ci.org/github/iostrovok/cacheproxy)
+# CacheProxy [![Build Status](https://travis-ci.org/iostrovok/cacheproxy.svg?branch=master)](https://travis-ci.org/github/iostrovok/cacheproxy)
 
 CacheProxy is a simple way to test over http offline.
 
