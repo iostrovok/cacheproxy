@@ -62,7 +62,7 @@ func (s *testSuite) TestSQL_1(c *C) {
 
 	defer os.Remove(fileName)
 
-	unit := &store.StoreUnit{
+	unit := &store.Item{
 		Request:      []byte{100},
 		ResponseBody: []byte{101},
 		ResponseHeader: http.Header{

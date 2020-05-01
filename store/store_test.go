@@ -15,7 +15,7 @@ func TestService(t *testing.T) { TestingT(t) }
 
 func (s *testSuite) TestToZip(c *C) {
 
-	unit := &StoreUnit{
+	unit := &Item{
 		Request:      []byte{100},
 		ResponseBody: []byte{101},
 		ResponseHeader: http.Header{
@@ -41,7 +41,7 @@ func (s *testSuite) TestFromZip_Error(c *C) {
 
 func (s *testSuite) TestFromZip(c *C) {
 
-	in := &StoreUnit{
+	in := &Item{
 		Request:      []byte{100},
 		ResponseBody: []byte{101},
 		ResponseHeader: http.Header{

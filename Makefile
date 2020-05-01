@@ -1,5 +1,5 @@
 CURDIR := $(shell pwd)
-DIR:=FILE_DIR=$(CURDIR)/testfiles TEST_SOURCE_PATH=$(CURDIR)
+DIR:=TEST_SOURCE_PATH=$(CURDIR)
 
 
 ##
@@ -9,11 +9,13 @@ DIR:=FILE_DIR=$(CURDIR)/testfiles TEST_SOURCE_PATH=$(CURDIR)
 ## default:
 all: test
 
+test-travis:
+	 go test  -race ./...
 
 test: clean
 	@echo "======================================================================"
 	@echo "Run race test for ./"
-	cd $(CURDIR)/ && $(DIR) $(GODEBUG) go test -coverprofile=$(CURDIR)/coverage.main.out -race ./...
+	cd $(CURDIR)/ && go test -coverprofile=$(CURDIR)/coverage.main.out -race ./...
 	go tool cover -html=$(CURDIR)/coverage.main.out -o $(CURDIR)/coverage.main.html
 	@rm -f $(CURDIR)/coverage.main.out
 	@rm -f  ./cassettes/*
@@ -32,7 +34,6 @@ fmt:
 mod:
 	@echo "======================================================================"
 	@echo "Run MOD"
-	@go mod verify
 	@go mod tidy
 	@go mod vendor
 	@go mod download

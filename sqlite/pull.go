@@ -14,18 +14,23 @@ func init() {
 }
 
 type Pull struct {
-	mx        sync.RWMutex
-	conns     map[string]*SQL
-	deleteOld bool
+	mx          sync.RWMutex
+	conns       map[string]*SQL
+	sessionMode bool
+
+	requested map[string]bool
 }
 
+// global variable
 var pull *Pull
 
-func New(ctx ...context.Context) *Pull {
+func New(sessionMode bool, ctx ...context.Context) *Pull {
 
 	out := &Pull{
-		mx:    sync.RWMutex{},
-		conns: map[string]*SQL{},
+		mx:          sync.RWMutex{},
+		conns:       map[string]*SQL{},
+		requested:   map[string]bool{},
+		sessionMode: sessionMode,
 	}
 
 	if len(ctx) > 0 {
@@ -39,12 +44,12 @@ func New(ctx ...context.Context) *Pull {
 	return out
 }
 
-func Init(ctx ...context.Context) {
+func Init(sessionMode bool, ctx ...context.Context) {
 	globalPullMutex.Lock()
 	defer globalPullMutex.Unlock()
 
 	if pull == nil {
-		pull = New(ctx...)
+		pull = New(sessionMode, ctx...)
 	}
 }
 
@@ -53,38 +58,12 @@ func Close() error {
 	return pull.Close()
 }
 
-func Add(fileName string) (*SQL, error) {
-	return pull.Add(fileName)
+func Upsert(fileName, id string, unit *store.Item) error {
+	return pull.Upsert(fileName, id, unit)
 }
 
-func Get(fileName string) (*SQL, error) {
-	return pull.Get(fileName)
-}
-
-func Upsert(fileName, args string, unit *store.StoreUnit) error {
-	return pull.Upsert(fileName, args, unit)
-}
-
-func Select(fileName, args string) (*store.StoreUnit, error) {
-	return pull.Select(fileName, args)
-}
-
-func DeleteOldFromNow() error {
-	return pull.DeleteOldFromNow()
-}
-
-// -----------------------------------
-
-func (p *Pull) DeleteOldFromNow() error {
-	p.deleteOld = true
-
-	for _, c := range p.conns {
-		c.UpdateTimeRead(true)
-		if err := c.fixTimeForCut(); err != nil {
-			return err
-		}
-	}
-	return nil
+func Select(fileName, id string) (*store.Item, error) {
+	return pull.Select(fileName, id)
 }
 
 func (p *Pull) Close() error {
@@ -109,18 +88,17 @@ func (p *Pull) DeleteOld() (int64, error) {
 	p.mx.Lock()
 	defer p.mx.Unlock()
 
-	if !p.deleteOld {
+	if !p.sessionMode {
 		return 0, nil
 	}
 
 	total := int64(0)
-
 	for _, c := range p.conns {
 		if c == nil {
 			continue
 		}
 
-		deleted, err := c.DeleteOld()
+		deleted, err := c.DeleteOld(p.requested)
 		if err != nil {
 			return 0, err
 		}
@@ -144,11 +122,6 @@ func (p *Pull) Add(fileName string) (*SQL, error) {
 		p.conns[fileName] = c
 	}
 
-	c.UpdateTimeRead(p.deleteOld)
-	if p.deleteOld {
-		err = c.fixTimeForCut()
-	}
-
 	return c, err
 }
 
@@ -166,18 +139,25 @@ func (p *Pull) Get(fileName string) (*SQL, error) {
 }
 
 // Upsert just inserts or update one record
-func (p *Pull) Upsert(fileName, args string, unit *store.StoreUnit) error {
+func (p *Pull) Upsert(fileName, id string, unit *store.Item) error {
 	c, err := p.Get(fileName)
 	if err != nil {
 		return err
 	}
-	return c.Upsert(args, unit)
+
+	if p.sessionMode {
+		p.mx.Lock()
+		p.requested[id] = true
+		p.mx.Unlock()
+	}
+
+	return c.Upsert(id, unit)
 }
 
-func (p *Pull) Select(fileName, args string) (*store.StoreUnit, error) {
+func (p *Pull) Select(fileName, id string) (*store.Item, error) {
 	c, err := p.Get(fileName)
 	if err != nil {
 		return nil, err
 	}
-	return c.Select(args)
+	return c.Select(id)
 }

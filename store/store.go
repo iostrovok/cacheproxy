@@ -3,19 +3,32 @@ package store
 import (
 	"bytes"
 	"compress/zlib"
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 )
 
-type StoreUnit struct {
-	Request        []byte      `json:"request"`
-	ResponseBody   []byte      `json:"response_body"`
+type Item struct {
+	// Request as is
+	Request []byte `json:"request"`
+
+	// Response Body as is
+	ResponseBody []byte `json:"response_body"`
+
+	// Response headers Body as is
 	ResponseHeader http.Header `json:"response_header"`
-	StatusCode     int         `json:"status_code"`
+
+	// status code
+	StatusCode int `json:"status_code"`
+
+	// for compare and debug goals
+	// it's not stored in files
+	Hash string `json:"-"`
 }
 
-func (s *StoreUnit) ToZip() ([]byte, error) {
+func (s *Item) ToZip() ([]byte, error) {
 
 	body, err := json.Marshal(s)
 	if err != nil {
@@ -32,7 +45,7 @@ func (s *StoreUnit) ToZip() ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func FromZip(body []byte) (*StoreUnit, error) {
+func FromZip(body []byte, needHash ...bool) (*Item, error) {
 	b := bytes.Buffer{}
 	r, err := zlib.NewReader(bytes.NewBuffer(body))
 	if err != nil {
@@ -44,7 +57,11 @@ func FromZip(body []byte) (*StoreUnit, error) {
 	}
 	r.Close()
 
-	s := &StoreUnit{}
+	s := &Item{}
 	err = json.Unmarshal(b.Bytes(), &s)
+
+	if len(needHash) > 0 && needHash[0] {
+		s.Hash = fmt.Sprintf("%x", md5.Sum(body))
+	}
 	return s, err
 }

@@ -19,7 +19,9 @@ type Config struct {
 	ForceSave        bool
 	DynamoFileName   bool
 	URL              *url.URL
-	DeleteOldFromNow bool
+
+	// This option provides deleting records which weren't requested during tests.
+	SessionMode bool
 }
 
 func (cfg *Config) Init() (err error) {

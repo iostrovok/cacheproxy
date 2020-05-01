@@ -5,12 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	. "github.com/iostrovok/check"
@@ -30,17 +28,13 @@ var _ = Suite(&testSuite{})
 
 func TestService(t *testing.T) { TestingT(t) }
 
-var manager *Manager
-var manager2 *Manager
 var testHome string
 
 //Run once when the suite starts running.
 func (s *testSuite) SetUpSuite(c *C) {
+	testHome = os.TempDir()
 	s.globalCtx, s.globalCancel = context.WithCancel(context.Background())
-	cfg := baseCfg()
-	cfg.Port = StandaloneServerPort
-	err := Server(s.globalCtx, cfg)
-	c.Assert(err, IsNil)
+	fmt.Printf("testHome: %s\n\n", testHome)
 }
 
 //Run before each test or benchmark starts running.
@@ -49,48 +43,40 @@ func (s *testSuite) SetUpTest(c *C) {}
 //Run after each test or benchmark runs.
 func (s *testSuite) TearDownTest(c *C) {}
 
-//Run once after all tests or benchmarks have finished running.
+// Run once after all tests or benchmarks have finished running.
 func (s *testSuite) TearDownSuite(c *C) {
 	s.globalCancel()
-}
-
-func init() {
-	testHome = os.Getenv("TEST_SOURCE_PATH")
-	if testHome == "" {
-		log.Fatal("Please setup the TEST_SOURCE_PATH")
+	tmpFiles := []string{"my_post_test.db", "my_get_test.db", "test_0.db", "test_1.db", "test_2.db",
+		"test_3.db", "test_0.db", "test_1.db", "test_2.db", "test_3.db"}
+	for _, fileName := range tmpFiles {
+		os.RemoveAll(filepath.Join(testHome, fileName))
 	}
-
-	manager = NewManager(18801, 18899, baseCfg())
-	manager2 = NewManager(19001, 19001, baseCfg())
 }
 
-func baseCfg() *config.Config {
+func baseCfg(url, fileName string, port int) *config.Config {
 	return &config.Config{
-		Host:      "http://127.0.0.1:9200", // local elastisearch
-		Scheme:    "http",                  // http OR https
-		StorePath: filepath.Join(testHome, "cassettes"),
+		Scheme:    "http", // http OR https
+		StorePath: testHome,
 		Verbose:   true,
 		ForceSave: false,
+		Host:      url, // like "http://127.0.0.1:9200"
+		Port:      port,
+		FileName:  fileName,
 	}
 }
 
 func (s *testSuite) TestGet(c *C) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	counter := 0
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		counter++
 		fmt.Fprintln(w, "Hello, client - TestGet")
 	}))
 	defer ts.Close()
 
-	cfg := baseCfg()
-	cfg.Host = ts.URL
-	cfg.Port = 19201
-	cfg.FileName = "my_test.db"
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	cfg := baseCfg(ts.URL, "my_get_test.db", 19201)
 
 	handler.Start(ctx, cfg)
 	c.Assert(ctx, NotNil)
@@ -115,6 +101,10 @@ func (s *testSuite) TestGet(c *C) {
 }
 
 func (s *testSuite) TestPost(c *C) {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	counter := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		counter++
@@ -122,13 +112,7 @@ func (s *testSuite) TestPost(c *C) {
 	}))
 	defer ts.Close()
 
-	cfg := baseCfg()
-	cfg.Host = ts.URL
-	cfg.Port = 19200
-	cfg.FileName = "my_test_2.db"
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	cfg := baseCfg(ts.URL, "my_post_test.db", 19200)
 
 	handler.Start(ctx, cfg)
 	c.Assert(ctx, NotNil)
@@ -150,86 +134,4 @@ func (s *testSuite) TestPost(c *C) {
 	c.Assert(err2, IsNil)
 	c.Assert(string(body2), DeepEquals, "Hello, client - TestPost\n")
 	c.Assert(counter, Equals, 1)
-}
-
-func (s *testSuite) TestWithManager(c *C) {
-	c.Skip("TestPost")
-
-	wg := sync.WaitGroup{}
-	for _, fileName := range []string{"test_0.db", "test_1.db", "test_2.db", "test_3.db", "test_0.db", "test_1.db", "test_2.db", "test_3.db"} {
-		wg.Add(1)
-		go func(c *C, fileName string) {
-			defer wg.Done()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			port, err := manager.RunSrv(ctx, fileName)
-			c.Assert(port, NotNil)
-			defer cancel()
-
-			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/beer/beer/OQ3ur2wBHqN_LZyul2Oh", port))
-			c.Assert(err, IsNil)
-
-			defer resp.Body.Close()
-			body, err := ioutil.ReadAll(resp.Body)
-			c.Assert(err, IsNil)
-			c.Assert(len(body), Equals, 710)
-
-			//c.Assert(stopFunc(), IsNil)
-
-		}(c, fileName)
-	}
-
-	wg.Wait()
-}
-
-func (s *testSuite) TestWithManager2(c *C) {
-	c.Skip("TestPost")
-
-	wg := sync.WaitGroup{}
-	for _, fileName := range []string{"test_10.db"} {
-		wg.Add(1)
-		go func(c *C, fileName string) {
-			defer wg.Done()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			port, err := manager2.RunSrv(ctx, fileName)
-			c.Assert(err, IsNil)
-			defer cancel()
-
-			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/beer/beer/OQ3ur2wBHqN_LZyul2Oh", port))
-			c.Assert(err, IsNil)
-
-			defer resp.Body.Close()
-			body, err := ioutil.ReadAll(resp.Body)
-			c.Assert(err, IsNil)
-			c.Assert(len(body), Equals, 710)
-			//c.Assert(stopFunc(), IsNil)
-		}(c, fileName)
-	}
-
-	wg.Wait()
-}
-
-func (s *testSuite) TestWithStandaloneServer(c *C) {
-	c.Skip("TestPost")
-
-	wg := sync.WaitGroup{}
-
-	for i := 0; i < 50; i++ {
-		wg.Add(1)
-		go func(c *C) {
-			defer wg.Done()
-
-			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/beer/beer/Og1VtGwBHqN_LZyuhGNG", StandaloneServerPort))
-			c.Assert(err, IsNil)
-
-			defer resp.Body.Close()
-			body, err := ioutil.ReadAll(resp.Body)
-
-			c.Assert(err, IsNil)
-			c.Assert(len(body), Equals, 1166)
-		}(c)
-	}
-
-	wg.Wait()
 }
