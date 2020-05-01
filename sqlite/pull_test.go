@@ -16,7 +16,7 @@ func (s *testSuite) TestSQL_Pull_New(c *C) {
 	fileName := tmpFile(c)
 	defer os.Remove(fileName)
 
-	p := New()
+	p := New(false)
 	q, err := p.Get(fileName)
 	c.Assert(err, IsNil)
 	c.Assert(q, NotNil)
@@ -29,7 +29,7 @@ func (s *testSuite) TestSQL_Pull_Add(c *C) {
 	fileName := tmpFile(c)
 	defer os.Remove(fileName)
 
-	q, err := (New()).Add(fileName)
+	q, err := (New(false)).Add(fileName)
 	c.Assert(err, IsNil)
 	c.Assert(q, NotNil)
 }
@@ -49,7 +49,7 @@ func (s *testSuite) TestSQL_Pull_2(c *C) {
 
 	key := "TestSQL_Pull_2"
 
-	p := New()
+	p := New(false)
 	p.Upsert(fileName, key, unit)
 
 	c.Assert(p.Upsert(fileName, key, unit), IsNil)
@@ -73,7 +73,7 @@ func (s *testSuite) TestSQL_Pull_Multi(c *C) {
 	key := "TestSQL_Pull_2"
 	wg := sync.WaitGroup{}
 
-	p := New()
+	p := New(false)
 
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
@@ -87,7 +87,7 @@ func (s *testSuite) TestSQL_Pull_Multi(c *C) {
 }
 
 // test syntax only
-func (s *testSuite) TestSQL_Pull_Multi_DeleteOld(c *C) {
+func (s *testSuite) TestSQL_Pull_SsessionMode(c *C) {
 
 	countFiles := 7
 	files := make([]string, countFiles)
@@ -105,7 +105,7 @@ func (s *testSuite) TestSQL_Pull_Multi_DeleteOld(c *C) {
 		"2-TestSQL_Pull_Global-4", "2-TestSQL_Pull_Global-5", "2-TestSQL_Pull_Global-6"}
 
 	wg := sync.WaitGroup{}
-	p := New()
+	p := New(false)
 
 	for i := 0; i < 6*countFiles; i++ {
 		wg.Add(1)
@@ -116,8 +116,10 @@ func (s *testSuite) TestSQL_Pull_Multi_DeleteOld(c *C) {
 	}
 	wg.Wait()
 
-	c.Assert(p.DeleteOldFromNow(), IsNil)
+	c.Assert(p.Close(), IsNil)
 	time.Sleep(1 * time.Second)
+
+	p = New(true)
 
 	wg = sync.WaitGroup{}
 	for i := 0; i < 6*countFiles; i++ {
@@ -173,7 +175,7 @@ func (s *testSuite) TestSQL_Pull_Global(c *C) {
 	wg := sync.WaitGroup{}
 
 	// make global object
-	Init()
+	Init(false)
 
 	for i := 0; i < 10; i++ {
 		wg.Add(1)

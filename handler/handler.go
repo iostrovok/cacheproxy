@@ -15,10 +15,6 @@ import (
 	"github.com/iostrovok/cacheproxy/store"
 )
 
-func init() {
-	sqlite.Init()
-}
-
 func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 
 	key, requestDump, err := cacheKey(req)

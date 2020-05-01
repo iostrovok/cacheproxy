@@ -17,11 +17,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 		return err
 	}
 
-	sqlite.Init(ctx)
-
-	if cfg.DeleteOldFromNow {
-		sqlite.DeleteOldFromNow()
-	}
+	sqlite.Init(cfg.SessionMode, ctx)
 
 	// server wants to serve itself port
 	portBlocker.Lock(cfg.Port)

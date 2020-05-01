@@ -24,7 +24,7 @@ func main() {
 
 	for i, r := range res {
 		rec := r.Records[0]
-		fmt.Printf("%d] %s: %s\n", i, r.Diff.String(), rec.Args)
+		fmt.Printf("%d] %s: %s\n", i, r.Diff.String(), rec.ID)
 		if r.Diff != utils.Ok {
 			fmt.Printf("\n\n%s\n\n", string(rec.Body.Request))
 		}

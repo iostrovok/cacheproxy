@@ -21,23 +21,17 @@ func init() {
 //
 type Record struct {
 	// Args is unique key: MD5 hash from url + request
-	Args string `json:"args"`
-
-	// LastDate is unix time creating (or last reading) of record.
-	// Using for cleanup files from old records.
-	LastDate int64 `json:"last_date"`
+	ID string `json:"id"`
 
 	// See github.com/iostrovok/cacheproxy/store
 	Body *store.Item `json:"body"`
 }
 
 type SQL struct {
-	mx             sync.RWMutex
-	fileName       string
-	db             *sql.DB
-	testCounter    int
-	timeForCut     int
-	updateTimeRead bool
+	mx          sync.RWMutex
+	fileName    string
+	db          *sql.DB
+	testCounter int
 }
 
 // Exists reports whether the named file or directory exists.
@@ -80,10 +74,6 @@ func conn(fileName string) (*SQL, error) {
 	return c, err
 }
 
-func (s *SQL) UpdateTimeRead(updateTimeRead bool) {
-	s.updateTimeRead = updateTimeRead
-}
-
 func (s *SQL) Close() error {
 	var err error
 	if s.db != nil {
@@ -103,77 +93,44 @@ func (s *SQL) Open() error {
 	return nil
 }
 
-// execTx executes one command without transaction
-func (s *SQL) exec(command string, args ...interface{}) error {
-	s.mx.Lock()
-	defer s.mx.Unlock()
-
-	statement, err := s.db.Prepare(command)
-	if err == nil {
-		_, err = statement.Exec(args...)
-	}
-
-	return err
-}
-
 // execTx executes one command with transaction
-func (s *SQL) execTx(command string, args ...interface{}) (sql.Result, error) {
+func (s *SQL) execTx(command string, args ...interface{}) error {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
 	tx, err := s.db.Begin()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
 	defer tx.Commit()
 
-	return tx.Exec(command, args...)
-}
-
-func (s *SQL) CreateTable() error {
-	createTableSQL := "CREATE TABLE main (args TEXT, last_date INTEGER, body BLOB, PRIMARY KEY(args))"
-	dropTableSQL := "DROP TABLE main"
-	indexSQL := "CREATE INDEX idx_last_date ON main (last_date)"
-
-	if _, err := s.execTx(createTableSQL); err != nil {
-		return err
-	}
-
-	if _, err := s.execTx(indexSQL); err != nil {
-		s.execTx(dropTableSQL) // ignore error
-		return err
-	}
-
-	return nil
-}
-
-// We are passing db reference connection from main to our method with other parameters
-func (s *SQL) Upsert(args string, unit *store.Item) error {
-
-	// don't update time if it's not necessary
-	insertSQL := `INSERT INTO main(args, body, last_date) VALUES(?, ?, strftime('%s','now'))
-		ON CONFLICT(args)
-		DO UPDATE SET body=excluded.body, last_date = strftime('%s','now')
-		WHERE excluded.args = main.args AND excluded.body <> main.body`
-
-	if s.updateTimeRead {
-		insertSQL = `INSERT INTO main(args, body, last_date) VALUES(?, ?, strftime('%s','now'))
-			ON CONFLICT(args)
-			DO UPDATE SET body=excluded.body, last_date = strftime('%s','now') WHERE excluded.args = main.args`
-	}
-
-	body, err := unit.ToZip()
-	if err != nil {
-		return err
-	}
-	_, err = s.execTx(insertSQL, args, body)
+	_, err = tx.Exec(command, args...)
 	return err
 }
 
-func (s *SQL) Select(args string) (*store.Item, error) {
+// CreateTable just makes new table
+func (s *SQL) CreateTable() error {
+	return s.execTx("CREATE TABLE main (id TEXT, body BLOB, PRIMARY KEY(id))")
+}
+
+// Upsert
+func (s *SQL) Upsert(id string, unit *store.Item) error {
+
+	// don't update time if it's not necessary
+	insertSQL := `INSERT INTO main(id, body) VALUES(?, ?)
+		ON CONFLICT(id) DO UPDATE SET body=excluded.body WHERE excluded.id = main.id`
+
+	body, err := unit.ToZip()
+	if err == nil {
+		err = s.execTx(insertSQL, id, body)
+	}
+	return err
+
+}
+
+func (s *SQL) Select(id string) (*store.Item, error) {
 	s.mx.RLock()
-	row := s.db.QueryRow(`SELECT body FROM main WHERE args = ?`, args)
+	row := s.db.QueryRow(`SELECT body FROM main WHERE id = ?`, id)
 	s.mx.RUnlock()
 
 	body := make([]byte, 0)
@@ -182,19 +139,13 @@ func (s *SQL) Select(args string) (*store.Item, error) {
 		return nil, err
 	}
 
-	if s.updateTimeRead {
-		if err := s.setTimeRead(args); err != nil {
-			return nil, err
-		}
-	}
-
 	return store.FromZip(body)
 }
 
-// SelectAll return all rows sorted by args
+// SelectAll returns all rows sorted by id
 func (s *SQL) SelectAll() ([]*Record, error) {
 	s.mx.RLock()
-	row, err := s.db.Query("SELECT args, last_date, body FROM main ORDER BY args")
+	row, err := s.db.Query("SELECT id, body FROM main ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -205,43 +156,75 @@ func (s *SQL) SelectAll() ([]*Record, error) {
 	for row.Next() {
 		rec := Record{}
 		body := make([]byte, 0)
-		if err := row.Scan(&rec.Args, &rec.LastDate, &body); err != nil {
+		if err := row.Scan(&rec.ID, &body); err != nil {
 			return nil, err
 		}
-
 		if rec.Body, err = store.FromZip(body, true); err != nil {
 			return nil, err
 		}
-
 		out = append(out, &rec)
 	}
 	return out, nil
 }
 
-func (s *SQL) setTimeRead(args string) error {
-	setTimeSQL := `UPDATE main SET last_date = strftime('%s','now') WHERE args = ?`
-	_, err := s.execTx(setTimeSQL, args)
-	return err
-}
-
-func (s *SQL) DeleteOld() (int64, error) {
-	return s.DeleteOldByTime(s.timeForCut)
-}
-
-func (s *SQL) DeleteOldByTime(timeForCut int) (int64, error) {
-
-	count := int64(0)
-	res, err := s.execTx("DELETE from main WHERE last_date < ?", timeForCut)
-	if err == nil {
-		count, err = res.RowsAffected()
-	}
-	return count, err
-}
-
-func (s *SQL) fixTimeForCut() error {
+// SelectAllID returns all row id sorted by id
+func (s *SQL) SelectAllID() ([]string, error) {
 	s.mx.RLock()
-	row := s.db.QueryRow(`SELECT strftime('%s','now') as t`)
+	row, err := s.db.Query("SELECT id FROM main ORDER BY id")
+	if err != nil {
+		return nil, err
+	}
+	defer row.Close()
 	s.mx.RUnlock()
 
-	return row.Scan(&s.timeForCut)
+	out := make([]string, 0)
+	for row.Next() {
+		rec := ""
+		if err := row.Scan(&rec); err != nil {
+			return nil, err
+		}
+		out = append(out, rec)
+	}
+	return out, nil
+}
+
+func (s *SQL) DeleteOld(requested map[string]bool) (int64, error) {
+
+	total := int64(0)
+	ids, err := s.SelectAllID()
+	if err != nil {
+		return total, err
+	}
+
+	delStmt, err := s.db.Prepare("DELETE from main WHERE id = ?")
+	if err != nil {
+		return total, err
+	}
+
+	for _, id := range ids {
+		if requested[id] {
+			continue
+		}
+
+		tx, err := s.db.Begin()
+		if err != nil {
+			return total, err
+		}
+		res, err := tx.Stmt(delStmt).Exec(id)
+		if err != nil {
+			return total, err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return total, err
+		}
+
+		count, err := res.RowsAffected()
+		if err != nil {
+			return total, err
+		}
+		total += count
+	}
+
+	return total, err
 }

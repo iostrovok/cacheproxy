@@ -1,12 +1,14 @@
 package cacheproxy
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	. "github.com/iostrovok/check"
@@ -32,10 +34,7 @@ var testHome string
 func (s *testSuite) SetUpSuite(c *C) {
 	testHome = os.TempDir()
 	s.globalCtx, s.globalCancel = context.WithCancel(context.Background())
-	//cfg := baseCfg()
-	//cfg.Port = StandaloneServerPort
-	//err := Server(s.globalCtx, cfg)
-	//c.Assert(err, IsNil)
+	fmt.Printf("testHome: %s\n\n", testHome)
 }
 
 //Run before each test or benchmark starts running.
@@ -47,38 +46,37 @@ func (s *testSuite) TearDownTest(c *C) {}
 // Run once after all tests or benchmarks have finished running.
 func (s *testSuite) TearDownSuite(c *C) {
 	s.globalCancel()
+	tmpFiles := []string{"my_post_test.db", "my_get_test.db", "test_0.db", "test_1.db", "test_2.db",
+		"test_3.db", "test_0.db", "test_1.db", "test_2.db", "test_3.db"}
+	for _, fileName := range tmpFiles {
+		os.RemoveAll(filepath.Join(testHome, fileName))
+	}
 }
 
-func baseCfg() *config.Config {
+func baseCfg(url, fileName string, port int) *config.Config {
 	return &config.Config{
-		// host will be set up later
-		//Host:      "http://127.0.0.1:9200", // local elastisearch
-
 		Scheme:    "http", // http OR https
 		StorePath: testHome,
 		Verbose:   true,
 		ForceSave: false,
+		Host:      url, // like "http://127.0.0.1:9200"
+		Port:      port,
+		FileName:  fileName,
 	}
 }
 
 func (s *testSuite) TestGet(c *C) {
-	//c.Skip("TestPost")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	counter := 0
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		counter++
 		fmt.Fprintln(w, "Hello, client - TestGet")
 	}))
 	defer ts.Close()
 
-	cfg := baseCfg()
-	cfg.Host = ts.URL
-	cfg.Port = 19201
-	cfg.FileName = "my_test.db"
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	cfg := baseCfg(ts.URL, "my_get_test.db", 19201)
 
 	handler.Start(ctx, cfg)
 	c.Assert(ctx, NotNil)
@@ -99,5 +97,41 @@ func (s *testSuite) TestGet(c *C) {
 	body2, err2 := ioutil.ReadAll(resp2.Body)
 	c.Assert(err2, IsNil)
 	c.Assert(string(body2), DeepEquals, "Hello, client - TestGet\n")
+	c.Assert(counter, Equals, 1)
+}
+
+func (s *testSuite) TestPost(c *C) {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	counter := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		counter++
+		fmt.Fprintln(w, "Hello, client - TestPost")
+	}))
+	defer ts.Close()
+
+	cfg := baseCfg(ts.URL, "my_post_test.db", 19200)
+
+	handler.Start(ctx, cfg)
+	c.Assert(ctx, NotNil)
+
+	buf := []byte(`{"from":0,"query":{"bool":{"must":[{"match":{"brands":"Abita Amber"}}]}},"size":25}`)
+
+	resp, err := http.Post("http://localhost:19200/beer/_search", "application/json", bytes.NewReader(buf))
+	c.Assert(err, IsNil)
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, IsNil)
+	c.Assert(string(body), DeepEquals, "Hello, client - TestPost\n")
+	c.Assert(counter, Equals, 1)
+
+	resp2, err2 := http.Post("http://localhost:19200/beer/_search", "application/json", bytes.NewReader(buf))
+	c.Assert(err2, IsNil)
+	defer resp2.Body.Close()
+	body2, err2 := ioutil.ReadAll(resp2.Body)
+	c.Assert(err2, IsNil)
+	c.Assert(string(body2), DeepEquals, "Hello, client - TestPost\n")
 	c.Assert(counter, Equals, 1)
 }
