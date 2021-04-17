@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 
 	"github.com/iostrovok/cacheproxy/config"
 	"github.com/iostrovok/cacheproxy/sqlite"
@@ -17,7 +18,7 @@ import (
 
 func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 
-	key, requestDump, err := cacheKey(req)
+	key, requestDump, err := cacheKey(cfg, req)
 
 	if err != nil {
 		logError(cfg, err)
@@ -30,7 +31,7 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 
 	logPrintf(cfg, "Try to get %s", req.URL.String())
 
-	fileName := cfg.File(req.URL.String())
+	fileName := cfg.File(string(urlAsString(req.URL, cfg.NoUseDomain, cfg.NoUseUserData)))
 
 	if !cfg.ForceSave {
 		store, err := sqlite.Select(fileName, key)
@@ -84,12 +85,32 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 	w.Write(storeData.ResponseBody)
 }
 
-func cacheKey(req *http.Request) (string, []byte, error) {
+func urlAsString(u *url.URL, noUseDomain, noUseUserData bool) []byte {
 
-	b, err := req.URL.MarshalBinary()
-	if err != nil {
-		return "", nil, err
+	out := make([]byte, 0)
+	if !noUseUserData {
+		out = append(out, []byte(u.User.String())...)
 	}
+
+	if noUseDomain {
+		tmp := &url.URL{
+			Opaque:      u.Opaque,
+			Path:        u.Path,
+			RawPath:     u.RawPath,
+			ForceQuery:  u.ForceQuery,
+			RawQuery:    u.RawQuery,
+			Fragment:    u.Fragment,
+			RawFragment: u.RawFragment,
+		}
+		return append(out, []byte(tmp.String())...)
+	}
+
+	return append(out, []byte(u.String())...)
+}
+
+func cacheKey(cfg *config.Config, req *http.Request) (string, []byte, error) {
+
+	b := urlAsString(req.URL, cfg.NoUseDomain, cfg.NoUseUserData)
 
 	dump, err := httputil.DumpRequest(req, true)
 	if err != nil {
