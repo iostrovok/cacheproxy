@@ -22,6 +22,14 @@ type Config struct {
 
 	// This option provides deleting records which weren't requested during tests.
 	SessionMode bool
+
+	//If NoUseDomain is true proxy don't use domain name and port for storing data.
+	//So you may use it for test with different servers.
+	NoUseDomain bool
+
+	// If NoUseUserData is true proxy don't use user's name for storing data.
+	// So you may use it for test with different user.
+	NoUseUserData bool
 }
 
 func (cfg *Config) Init() (err error) {
