@@ -17,6 +17,7 @@ script:
   - export GOMAXPROCS=4
   - export GORACE=halt_on_error=1
   - rm -f  ./cassettes/*
+  - make mod
   - make test-travis
   - rm -f ./cassettes/*
 jobs:
