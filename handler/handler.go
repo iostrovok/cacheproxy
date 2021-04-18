@@ -100,7 +100,6 @@ func urlAsString(u *url.URL, noUseDomain, noUseUserData bool) []byte {
 			ForceQuery:  u.ForceQuery,
 			RawQuery:    u.RawQuery,
 			Fragment:    u.Fragment,
-			RawFragment: u.RawFragment,
 		}
 		return append(out, []byte(tmp.String())...)
 	}
