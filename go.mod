@@ -4,5 +4,5 @@ go 1.13
 
 require (
 	github.com/iostrovok/check v0.0.7
-	github.com/mattn/go-sqlite3 v1.14.6
+	github.com/mattn/go-sqlite3 v1.14.7
 )
