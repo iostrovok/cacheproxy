@@ -29,7 +29,7 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 	req.URL.Host = cfg.URL.Host
 	req.URL.Scheme = cfg.URL.Scheme
 
-	logPrintf(cfg, "Try to get %s", req.URL.String())
+	logPrintf(cfg, "[ForceSave: %t] Try to get %s", cfg.ForceSave, req.URL.String())
 
 	fileName := cfg.File(string(urlAsString(req.URL, cfg.NoUseDomain, cfg.NoUseUserData)))
 
@@ -52,6 +52,7 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 			}
 			return
 		}
+		logPrintf(cfg, "NOT Found at cache key: %s for %s", key, req.URL.String())
 	}
 
 	logPrintf(cfg, "Loading from remote server.... %s", req.URL.String())
@@ -79,6 +80,9 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 	}
 	// <<<<<<<<<< store for next using
 
+	logPrintf(cfg, "Result of loading: StatusCode: %d, Response Length: %d",
+		storeData.StatusCode, len(storeData.ResponseBody))
+
 	// return result
 	copyHeader(w.Header(), storeData.ResponseHeader)
 	w.WriteHeader(storeData.StatusCode)
@@ -94,12 +98,12 @@ func urlAsString(u *url.URL, noUseDomain, noUseUserData bool) []byte {
 
 	if noUseDomain {
 		tmp := &url.URL{
-			Opaque:      u.Opaque,
-			Path:        u.Path,
-			RawPath:     u.RawPath,
-			ForceQuery:  u.ForceQuery,
-			RawQuery:    u.RawQuery,
-			Fragment:    u.Fragment,
+			Opaque:     u.Opaque,
+			Path:       u.Path,
+			RawPath:    u.RawPath,
+			ForceQuery: u.ForceQuery,
+			RawQuery:   u.RawQuery,
+			Fragment:   u.Fragment,
 		}
 		return append(out, []byte(tmp.String())...)
 	}
