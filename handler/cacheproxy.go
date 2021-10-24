@@ -7,17 +7,19 @@ import (
 	"net/http"
 
 	"github.com/iostrovok/cacheproxy/config"
-	"github.com/iostrovok/cacheproxy/sqlite"
+	"github.com/iostrovok/cacheproxy/plugins/sqlite"
 )
 
 func Start(ctx context.Context, cfg *config.Config) error {
-
 	err := cfg.Init()
 	if err != nil {
 		return err
 	}
 
-	sqlite.Init(cfg.SessionMode, ctx)
+	// it sets default keeper if that is necessary
+	if cfg.Keeper == nil {
+		cfg.Keeper = sqlite.New(ctx, cfg)
+	}
 
 	// server wants to serve itself port
 	portBlocker.Lock(cfg.Port)
@@ -34,8 +36,8 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	}
 
 	go func(cfg *config.Config, server *http.Server, listener net.Listener) {
-
 		ch := make(chan error, 1)
+
 		if cfg.Scheme == "https" {
 			select {
 			case <-ctx.Done():

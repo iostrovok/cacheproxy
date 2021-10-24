@@ -29,7 +29,6 @@ type Item struct {
 }
 
 func (s *Item) ToZip() ([]byte, error) {
-
 	body, err := json.Marshal(s)
 	if err != nil {
 		return nil, err
@@ -63,5 +62,6 @@ func FromZip(body []byte, needHash ...bool) (*Item, error) {
 	if len(needHash) > 0 && needHash[0] {
 		s.Hash = fmt.Sprintf("%x", md5.Sum(body))
 	}
+
 	return s, err
 }

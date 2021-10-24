@@ -70,10 +70,16 @@ func (s *testSuite) TestSQL_1(c *C) {
 		},
 	}
 
-	c.Assert(q.Upsert("test-1", unit), IsNil)
+	body, err := unit.ToZip()
+	c.Assert(err, IsNil)
 
-	unit2, err2 := q.Select("test-1")
-	c.Assert(err2, IsNil)
+	c.Assert(q.Upsert("test-1", body), IsNil)
+
+	body2, err := q.Select("test-1")
+	c.Assert(err, IsNil)
+
+	unit2, err := store.FromZip(body2)
+	c.Assert(err, IsNil)
 
 	c.Assert(unit2.Request, DeepEquals, unit.Request)
 	c.Assert(unit2.ResponseBody, DeepEquals, unit.ResponseBody)

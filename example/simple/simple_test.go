@@ -1,27 +1,26 @@
-# CacheProxy [![Build Status](https://travis-ci.org/iostrovok/cacheproxy.svg?branch=master)](https://travis-ci.org/github/iostrovok/cacheproxy)
+package simple
 
-CacheProxy is a simple way to test over http offline.
-
-#### Using
-
-Example for test with Elasticsearch:
-```go
-
-package mypackage
+/*
+	It is an example of tests of requests to elasticsearch (ES).
+	We will keep requests to ES in /my-project/cassettes directory.
+*/
 
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
-	"os"
 	"testing"
 
 	. "github.com/iostrovok/check"
 
 	"github.com/iostrovok/cacheproxy"
-	"github.com/iostrovok/cacheproxy/config"
+	cacheproxyConfig "github.com/iostrovok/cacheproxy/config"
 )
+
+var elasticsearchURL = ""
 
 type testSuite struct {
 	globalCtx    context.Context
@@ -34,34 +33,27 @@ func TestService(t *testing.T) { TestingT(t) }
 
 // Run once when the suite starts running.
 func (s *testSuite) SetUpSuite(c *C) {
-
 	s.globalCtx, s.globalCancel = context.WithCancel(context.Background())
-
-	/*
-	    Out application uses "ELASTICSEARCH_URL" for reading elasticsearch url like
-        ELASTICSEARCH_URL = "http://127.0.0.1:9200"
-	    We keep request to ES in /my-project/cassettes directory.
-	*/
 
 	tmpPort := 19200
 	schema := "http"
 
-	cassettesDir := "/my-project/cassettes" // Absolute path. 
-	elasticsearchUrl := os.Getenv("ELASTICSEARCH_URL")
+	elasticsearchUrl := "http://127.0.0.1:9200"
 	URL, err := url.Parse(elasticsearchUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	cfg := &config.Config{
+	// prepare the config for cacheproxy
+	cfg := &cacheproxyConfig.Config{
 		Host:      elasticsearchUrl,
 		Scheme:    schema,
-		StorePath: cassettesDir,
+		StorePath: "/my-project/cassettes", // Absolute path.
 		Verbose:   true,
 		ForceSave: false,
 		Port:      tmpPort,
 
-        // This option provides deleting records which weren't requested during tests.
+		// This option provides deleting records which weren't requested during tests.
 		SessionMode: true,
 	}
 
@@ -71,9 +63,7 @@ func (s *testSuite) SetUpSuite(c *C) {
 
 	URL.Scheme = schema
 	URL.Host = fmt.Sprintf("127.0.0.1:%d", tmpPort)
-	if err := os.Setenv("ELASTICSEARCH_URL", URL.String()); err != nil {
-		log.Fatal(err)
-	}
+	elasticsearchURL = URL.String()
 }
 
 //Run before each test or benchmark starts running.
@@ -85,34 +75,20 @@ func (s *testSuite) TearDownTest(c *C) {}
 
 //Run once after all tests or benchmarks have finished running.
 func (s *testSuite) TearDownSuite(c *C) {
-    // shotdown the cacheproxy servers
+	// shutdown the cacheproxy servers after tests
 	s.globalCancel()
 }
 
 // Test uses Elasticsearch
-func (s *testSuite) TestFirst(c *C) {
+func (s *testSuite) Test_First(c *C) {
 	// create connection to ES and others
-	server := InitServer(c)
-
-	// code which get data from ES
-	data, err := server.GetDataFromES()
+	resp, err := http.Get(elasticsearchURL + "/index/_search?q=*:*&track_total_hits=true&size=1")
 
 	// check result
 	c.Assert(err, IsNil)
-	c.Assert(data, DeepEquals, []string{"1", "2"})
+
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	c.Assert(body, Not(DeepEquals), []string{"1", "2"})
 }
-
-
-
-
-
-```
-
-
-## Using plugin
-
-```go
-
-
-README.md
-```

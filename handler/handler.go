@@ -3,65 +3,78 @@ package handler
 import (
 	"bytes"
 	"crypto/md5"
-	"database/sql"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
+	"strings"
 
 	"github.com/iostrovok/cacheproxy/config"
-	"github.com/iostrovok/cacheproxy/sqlite"
 	"github.com/iostrovok/cacheproxy/store"
 )
 
+var re *regexp.Regexp = regexp.MustCompile(`[^-_a-zA-Z0-9]+`)
+
 func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
-
-	key, requestDump, err := cacheKey(cfg, req)
-
+	err := finger(cfg, w, req)
 	if err != nil {
 		logError(cfg, err)
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
+	}
+}
+
+func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error {
+	requestDump, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		return err
+	}
+
+	key, err := cacheKey(cfg, req, requestDump)
+	if err != nil {
+		return err
 	}
 
 	req.URL.Host = cfg.URL.Host
 	req.URL.Scheme = cfg.URL.Scheme
+	urlStr := req.URL.String()
 
-	logPrintf(cfg, "[ForceSave: %t] Try to get %s", cfg.ForceSave, req.URL.String())
+	logPrintf(cfg, "[ForceSave: %t] Try to get %s", cfg.ForceSave, urlStr)
 
-	fileName := cfg.File(string(urlAsString(req.URL, cfg.NoUseDomain, cfg.NoUseUserData)))
-
+	fileName := fileKey(cfg, urlAsString(req.URL, cfg.NoUseDomain, cfg.NoUseUserData))
 	if !cfg.ForceSave {
-		store, err := sqlite.Select(fileName, key)
-		if err != nil && err != sql.ErrNoRows {
-			logError(cfg, err)
-			http.Error(w, err.Error(), http.StatusServiceUnavailable)
-			return
+		body, err := cfg.Keeper.Read(fileName, key)
+		if err != nil {
+			return err
 		}
 
-		// it means value is found
-		if store != nil {
-			logPrintf(cfg, "Found at cache key: %s for %s", key, req.URL.String())
-			copyHeader(w.Header(), store.ResponseHeader)
-			w.WriteHeader(store.StatusCode)
-			_, err := io.Copy(w, bytes.NewReader(store.ResponseBody))
-			if err != nil {
-				log.Print(err)
+		// it means value is found in cache
+		if body != nil && len(body) > 0 {
+			item := &store.Item{}
+			if item, err = store.FromZip(body); err == nil {
+				logPrintf(cfg, "Found at cache key: %s for %s", key, urlStr)
+				copyHeader(w.Header(), item.ResponseHeader)
+				w.WriteHeader(item.StatusCode)
+				if _, err = io.Copy(w, bytes.NewReader(item.ResponseBody)); err != nil {
+					if !cfg.Verbose { // always save errors
+						log.Print(err)
+					}
+				}
 			}
-			return
+
+			return err
 		}
-		logPrintf(cfg, "NOT Found at cache key: %s for %s", key, req.URL.String())
+
+		logPrintf(cfg, "NOT Found at cache key: %s for %s", key, urlStr)
 	}
 
-	logPrintf(cfg, "Loading from remote server.... %s", req.URL.String())
+	logPrintf(cfg, "Loading from remote server.... %s", urlStr)
 
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	if err != nil {
-		logError(cfg, err)
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -73,10 +86,13 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 		StatusCode:     resp.StatusCode,
 	}
 
-	if err := sqlite.Upsert(fileName, key, storeData); err != nil {
-		logError(cfg, err)
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
+	body, err := storeData.ToZip()
+	if err != nil {
+		return err
+	}
+
+	if err := cfg.Keeper.Save(fileName, key, body); err != nil {
+		return err
 	}
 	// <<<<<<<<<< store for next using
 
@@ -87,46 +103,58 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 	copyHeader(w.Header(), storeData.ResponseHeader)
 	w.WriteHeader(storeData.StatusCode)
 	w.Write(storeData.ResponseBody)
+
+	return nil
 }
 
-func urlAsString(u *url.URL, noUseDomain, noUseUserData bool) []byte {
-
-	out := make([]byte, 0)
-	if !noUseUserData {
-		out = append(out, []byte(u.User.String())...)
-	}
-
-	if noUseDomain {
-		tmp := &url.URL{
-			Opaque:     u.Opaque,
-			Path:       u.Path,
-			RawPath:    u.RawPath,
-			ForceQuery: u.ForceQuery,
-			RawQuery:   u.RawQuery,
-			Fragment:   u.Fragment,
+func cloneUrl(in *url.URL) *url.URL {
+	var user *url.Userinfo
+	if in.User != nil {
+		user = &url.Userinfo{}
+		if p, find := in.User.Password(); find {
+			user = url.UserPassword(in.User.Username(), p)
+		} else {
+			user = url.User(in.User.Username())
 		}
-		return append(out, []byte(tmp.String())...)
 	}
 
-	return append(out, []byte(u.String())...)
+	return &url.URL{
+		Scheme:      in.Scheme,
+		Opaque:      in.Opaque,
+		User:        user,
+		Host:        in.Host,
+		Path:        in.Path,
+		RawPath:     in.RawPath,
+		ForceQuery:  in.ForceQuery,
+		RawQuery:    in.RawQuery,
+		Fragment:    in.Fragment,
+		RawFragment: in.RawFragment,
+	}
 }
 
-func cacheKey(cfg *config.Config, req *http.Request) (string, []byte, error) {
-
-	b := urlAsString(req.URL, cfg.NoUseDomain, cfg.NoUseUserData)
-
-	dump, err := httputil.DumpRequest(req, true)
-	if err != nil {
-		return "", nil, err
+func urlAsString(in *url.URL, noUseDomain, noUseUserData bool) string {
+	u := cloneUrl(in)
+	u.Scheme = ""
+	if noUseDomain {
+		u.Host = ""
 	}
+	if noUseUserData {
+		u.User = nil
+	}
+
+	return strings.TrimLeft(u.String(), "/")
+}
+
+func cacheKey(cfg *config.Config, req *http.Request, dump []byte) (string, error) {
+	b := []byte(urlAsString(req.URL, cfg.NoUseDomain, cfg.NoUseUserData))
 
 	bodyParts := bytes.SplitN(dump, []byte("\r\n\r\n"), 2)
 	if len(bodyParts) == 2 {
 		b = append(b, bodyParts[1]...)
 	}
 
-	// convert key to human readable value
-	return fmt.Sprintf("%x", md5.Sum(b)), dump, nil
+	// convert key to human-readable value
+	return fmt.Sprintf("%x", md5.Sum(b)), nil
 }
 
 func logError(cfg *config.Config, err error) {
@@ -153,4 +181,12 @@ func copyHeader(dst, src http.Header) {
 			dst.Add(k, v)
 		}
 	}
+}
+
+func fileKey(cfg *config.Config, urlPath string) string {
+	if !cfg.DynamoFileName && cfg.FileName != "" {
+		return cfg.FileName
+	}
+
+	return re.ReplaceAllString(urlPath, "")
 }

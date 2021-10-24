@@ -2,11 +2,9 @@ package config
 
 import (
 	"net/url"
-	"path/filepath"
-	"regexp"
-)
 
-var re *regexp.Regexp = regexp.MustCompile(`[^-_a-zA-Z0-9]+`)
+	"github.com/iostrovok/cacheproxy/plugins"
+)
 
 type Config struct {
 	Host             string
@@ -30,6 +28,9 @@ type Config struct {
 	// If NoUseUserData is true proxy don't use user's name for storing data.
 	// So you may use it for test with different user.
 	NoUseUserData bool
+
+	// Saver and reader
+	Keeper plugins.IPlugin
 }
 
 func (cfg *Config) Init() (err error) {
@@ -37,12 +38,6 @@ func (cfg *Config) Init() (err error) {
 	return
 }
 
-func (cfg *Config) File(urlPath string) string {
-
-	if !cfg.DynamoFileName && cfg.FileName != "" {
-		return filepath.Join(cfg.StorePath, cfg.FileName)
-	}
-
-	urlPath = re.ReplaceAllString(urlPath, "") + ".db"
-	return filepath.Join(cfg.StorePath, urlPath)
+func (cfg *Config) SetKeeper(keeper plugins.IPlugin) {
+	cfg.Keeper = keeper
 }
