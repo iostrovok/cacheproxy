@@ -52,7 +52,6 @@ func Conn(fileName string) (*SQL, error) {
 }
 
 func conn(fileName string) (*SQL, error) {
-
 	testCounter++
 	c := &SQL{fileName: fileName, testCounter: testCounter}
 
@@ -114,21 +113,17 @@ func (s *SQL) CreateTable() error {
 }
 
 // Upsert
-func (s *SQL) Upsert(id string, unit *store.Item) error {
+func (s *SQL) Upsert(id string, body []byte) error {
 
 	// don't update time if it's not necessary
 	insertSQL := `INSERT INTO main(id, body) VALUES(?, ?)
 		ON CONFLICT(id) DO UPDATE SET body=excluded.body WHERE excluded.id = main.id`
 
-	body, err := unit.ToZip()
-	if err == nil {
-		err = s.execTx(insertSQL, id, body)
-	}
-	return err
+	return s.execTx(insertSQL, id, body)
 
 }
 
-func (s *SQL) Select(id string) (*store.Item, error) {
+func (s *SQL) Select(id string) ([]byte, error) {
 	s.mx.RLock()
 	row := s.db.QueryRow(`SELECT body FROM main WHERE id = ?`, id)
 	s.mx.RUnlock()
@@ -139,7 +134,7 @@ func (s *SQL) Select(id string) (*store.Item, error) {
 		return nil, err
 	}
 
-	return store.FromZip(body)
+	return body, nil
 }
 
 // SelectAll returns all rows sorted by id

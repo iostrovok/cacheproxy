@@ -3,8 +3,6 @@ package sqlite
 import (
 	"context"
 	"sync"
-
-	"github.com/iostrovok/cacheproxy/store"
 )
 
 var globalPullMutex sync.Mutex
@@ -58,11 +56,11 @@ func Close() error {
 	return pull.Close()
 }
 
-func Upsert(fileName, id string, unit *store.Item) error {
-	return pull.Upsert(fileName, id, unit)
+func Upsert(fileName, id string, body []byte) error {
+	return pull.Upsert(fileName, id, body)
 }
 
-func Select(fileName, id string) (*store.Item, error) {
+func Select(fileName, id string) ([]byte, error) {
 	return pull.Select(fileName, id)
 }
 
@@ -139,7 +137,7 @@ func (p *Pull) Get(fileName string) (*SQL, error) {
 }
 
 // Upsert just inserts or update one record
-func (p *Pull) Upsert(fileName, id string, unit *store.Item) error {
+func (p *Pull) Upsert(fileName, id string, body []byte) error {
 	c, err := p.Get(fileName)
 	if err != nil {
 		return err
@@ -151,13 +149,14 @@ func (p *Pull) Upsert(fileName, id string, unit *store.Item) error {
 		p.mx.Unlock()
 	}
 
-	return c.Upsert(id, unit)
+	return c.Upsert(id, body)
 }
 
-func (p *Pull) Select(fileName, id string) (*store.Item, error) {
+func (p *Pull) Select(fileName, id string) ([]byte, error) {
 	c, err := p.Get(fileName)
 	if err != nil {
 		return nil, err
 	}
+
 	return c.Select(id)
 }

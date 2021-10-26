@@ -47,15 +47,22 @@ func (s *testSuite) TestSQL_Pull_2(c *C) {
 		},
 	}
 
+	body, err := unit.ToZip()
+	c.Assert(err, IsNil)
+
 	key := "TestSQL_Pull_2"
 
 	p := New(false)
-	p.Upsert(fileName, key, unit)
+	p.Upsert(fileName, key, body)
 
-	c.Assert(p.Upsert(fileName, key, unit), IsNil)
+	c.Assert(p.Upsert(fileName, key, body), IsNil)
 
-	unit2, err2 := p.Select(fileName, key)
-	c.Assert(err2, IsNil)
+	body, err = p.Select(fileName, key)
+	c.Assert(err, IsNil)
+	c.Assert(body, HasLenMoreThan, 0)
+
+	unit2, err := store.FromZip(body)
+	c.Assert(err, IsNil)
 
 	c.Assert(unit2.Request, DeepEquals, unit.Request)
 	c.Assert(unit2.ResponseBody, DeepEquals, unit.ResponseBody)
@@ -87,8 +94,7 @@ func (s *testSuite) TestSQL_Pull_Multi(c *C) {
 }
 
 // test syntax only
-func (s *testSuite) TestSQL_Pull_SsessionMode(c *C) {
-
+func (s *testSuite) TestSQL_Pull_SessionMode(c *C) {
 	countFiles := 7
 	files := make([]string, countFiles)
 	for i := 0; i < countFiles; i++ {
@@ -133,7 +139,8 @@ func (s *testSuite) TestSQL_Pull_SsessionMode(c *C) {
 
 	count, err := p.DeleteOld()
 	c.Assert(err, IsNil)
-	c.Assert(int(count), Equals, countFiles*len(keys))
+	expected := countFiles * len(keys)
+	c.Assert(count, EqualsMore, expected)
 
 	c.Assert(p.Close(), IsNil)
 }
@@ -147,13 +154,17 @@ func raceSubTest(c *C, p *Pull, fileName, key string) {
 		},
 	}
 
+	body, err := unit.ToZip()
+	c.Assert(err, IsNil)
+
 	for i := 0; i < 100; i++ {
-		p.Upsert(fileName, key, unit)
+		c.Assert(p.Upsert(fileName, key, body), IsNil)
 
-		c.Assert(p.Upsert(fileName, key, unit), IsNil)
+		body2, err := p.Select(fileName, key)
+		c.Assert(err, IsNil)
 
-		unit2, err2 := p.Select(fileName, key)
-		c.Assert(err2, IsNil)
+		unit2, err := store.FromZip(body2)
+		c.Assert(err, IsNil)
 
 		c.Assert(unit2.Request, DeepEquals, unit.Request)
 		c.Assert(unit2.ResponseBody, DeepEquals, unit.ResponseBody)
@@ -181,7 +192,7 @@ func (s *testSuite) TestSQL_Pull_Global(c *C) {
 		wg.Add(1)
 		go func(file, key string) {
 			defer wg.Done()
-			globalRaceSubTest(c, file, key)
+			saveAndRead(c, file, key)
 		}(files[i%len(files)], keys[i%len(keys)])
 	}
 	wg.Wait()
@@ -189,7 +200,7 @@ func (s *testSuite) TestSQL_Pull_Global(c *C) {
 	c.Assert(Close(), IsNil)
 }
 
-func globalRaceSubTest(c *C, fileName, key string) {
+func saveAndRead(c *C, fileName, key string) {
 	unit := &store.Item{
 		Request:      []byte{100},
 		ResponseBody: []byte{101},
@@ -197,12 +208,17 @@ func globalRaceSubTest(c *C, fileName, key string) {
 			"HEADER-1": []string{"VALUE-1", "VALUE-2"},
 		},
 	}
+	body, err := unit.ToZip()
+	c.Assert(err, IsNil)
 
 	for i := 0; i < 100; i++ {
-		c.Assert(Upsert(fileName, key, unit), IsNil)
+		c.Assert(Upsert(fileName, key, body), IsNil)
 
-		unit2, err2 := Select(fileName, key)
-		c.Assert(err2, IsNil)
+		body2, err := Select(fileName, key)
+		c.Assert(err, IsNil)
+
+		unit2, err := store.FromZip(body2)
+		c.Assert(err, IsNil)
 
 		c.Assert(unit2.Request, DeepEquals, unit.Request)
 		c.Assert(unit2.ResponseBody, DeepEquals, unit.ResponseBody)

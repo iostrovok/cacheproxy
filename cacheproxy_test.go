@@ -32,9 +32,10 @@ var testHome string
 
 //Run once when the suite starts running.
 func (s *testSuite) SetUpSuite(c *C) {
-	testHome = os.TempDir()
+	dir, err := ioutil.TempDir(os.TempDir(), "prefix")
+	c.Assert(err, IsNil)
+	testHome = dir
 	s.globalCtx, s.globalCancel = context.WithCancel(context.Background())
-	fmt.Printf("testHome: %s\n\n", testHome)
 }
 
 //Run before each test or benchmark starts running.
@@ -82,26 +83,20 @@ func (s *testSuite) TestGet(c *C) {
 	c.Assert(ctx, NotNil)
 
 	// first request
-	resp, err := http.Get("http://127.0.0.1:19201/beer/beer/OQ3ur2wBHqN_LZyul2Oh")
-	c.Assert(err, IsNil)
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, IsNil)
-	c.Assert(string(body), DeepEquals, "Hello, client - TestGet\n")
-	c.Assert(counter, Equals, 1)
+	for i := 0; i < 10; i++ {
+		resp, err := http.Get("http://127.0.0.1:19201/beer/beer/OQ3ur2wBHqN_LZyul2Oh")
+		c.Assert(err, IsNil)
+		body, err := ioutil.ReadAll(resp.Body)
+		c.Assert(err, IsNil)
+		c.Assert(body, EqualsMore, "Hello, client - TestGet\n")
+		c.Assert(counter, Equals, 1)
+		resp.Body.Close()
+	}
 
-	// second request
-	resp2, err2 := http.Get("http://127.0.0.1:19201/beer/beer/OQ3ur2wBHqN_LZyul2Oh")
-	c.Assert(err2, IsNil)
-	defer resp2.Body.Close()
-	body2, err2 := ioutil.ReadAll(resp2.Body)
-	c.Assert(err2, IsNil)
-	c.Assert(string(body2), DeepEquals, "Hello, client - TestGet\n")
 	c.Assert(counter, Equals, 1)
 }
 
 func (s *testSuite) TestPost(c *C) {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -119,19 +114,14 @@ func (s *testSuite) TestPost(c *C) {
 
 	buf := []byte(`{"from":0,"query":{"bool":{"must":[{"match":{"brands":"Abita Amber"}}]}},"size":25}`)
 
-	resp, err := http.Post("http://localhost:19200/beer/_search", "application/json", bytes.NewReader(buf))
-	c.Assert(err, IsNil)
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, IsNil)
-	c.Assert(string(body), DeepEquals, "Hello, client - TestPost\n")
-	c.Assert(counter, Equals, 1)
+	for i := 0; i < 10; i++ {
+		resp, err := http.Post("http://localhost:19200/beer/_search", "application/json", bytes.NewReader(buf))
+		c.Assert(err, IsNil)
+		body, err := ioutil.ReadAll(resp.Body)
+		c.Assert(err, IsNil)
+		c.Assert(body, EqualsMore, "Hello, client - TestPost\n")
+		resp.Body.Close()
+	}
 
-	resp2, err2 := http.Post("http://localhost:19200/beer/_search", "application/json", bytes.NewReader(buf))
-	c.Assert(err2, IsNil)
-	defer resp2.Body.Close()
-	body2, err2 := ioutil.ReadAll(resp2.Body)
-	c.Assert(err2, IsNil)
-	c.Assert(string(body2), DeepEquals, "Hello, client - TestPost\n")
 	c.Assert(counter, Equals, 1)
 }
