@@ -31,6 +31,10 @@ type Config struct {
 
 	// Saver and reader
 	Keeper plugins.IPlugin
+
+	// SetLogger switches the plugin to debug mode and the plugin should print the filename and key.
+	// Returns error if this mode is not supported.
+	Logger plugins.ILogger
 }
 
 func (cfg *Config) Init() (err error) {
@@ -40,4 +44,8 @@ func (cfg *Config) Init() (err error) {
 
 func (cfg *Config) SetKeeper(keeper plugins.IPlugin) {
 	cfg.Keeper = keeper
+}
+
+func (cfg *Config) SetLogger(logger plugins.ILogger) {
+	cfg.Logger = logger
 }

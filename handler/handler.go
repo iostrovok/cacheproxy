@@ -16,7 +16,7 @@ import (
 	"github.com/iostrovok/cacheproxy/store"
 )
 
-var re *regexp.Regexp = regexp.MustCompile(`[^-_a-zA-Z0-9]+`)
+var re = regexp.MustCompile(`[^-_a-zA-Z0-9]+`)
 
 func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 	err := finger(cfg, w, req)
@@ -45,6 +45,7 @@ func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error 
 
 	fileName := fileKey(cfg, urlAsString(req.URL, cfg.NoUseDomain, cfg.NoUseUserData))
 	if !cfg.ForceSave {
+		cfg.Logger.Printf("read file: %s, key: %s", fileName, key)
 		body, err := cfg.Keeper.Read(fileName, key)
 		if err != nil {
 			return err
@@ -91,6 +92,7 @@ func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error 
 		return err
 	}
 
+	cfg.Logger.Printf("save file: %s, key: %s", fileName, key)
 	if err := cfg.Keeper.Save(fileName, key, body); err != nil {
 		return err
 	}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/iostrovok/cacheproxy/config"
+	"github.com/iostrovok/cacheproxy/logger"
 	"github.com/iostrovok/cacheproxy/plugins/sqlite"
 )
 
@@ -19,6 +20,11 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	// it sets default keeper if that is necessary
 	if cfg.Keeper == nil {
 		cfg.Keeper = sqlite.New(ctx, cfg)
+	}
+
+	// it sets default empty logger
+	if cfg.SetLogger == nil {
+		cfg.Logger = logger.New()
 	}
 
 	// server wants to serve itself port
