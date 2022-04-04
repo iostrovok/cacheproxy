@@ -23,7 +23,7 @@ func Start(ctx context.Context, cfg *config.Config) error {
 	}
 
 	// it sets default empty logger
-	if cfg.SetLogger == nil {
+	if cfg.Logger == nil {
 		cfg.Logger = logger.New()
 	}
 
