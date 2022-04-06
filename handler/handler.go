@@ -32,8 +32,8 @@ func logRequestPrintf(cfg *config.Config, forceSave bool, urlStr string, request
 	}
 
 	debugStr := string(requestDump)
-	if len(debugStr) > 100 {
-		debugStr = debugStr[:100]
+	if len(debugStr) > 400 {
+		debugStr = debugStr[:400]
 	}
 
 	logPrintf(cfg, "[ForceSave: %t] Try to get %s Request: [%s]", forceSave, urlStr, debugStr)
