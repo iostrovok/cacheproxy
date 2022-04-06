@@ -26,6 +26,19 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func logRequestPrintf(cfg *config.Config, forceSave bool, urlStr string, requestDump []byte) {
+	if !cfg.Verbose {
+		return
+	}
+
+	debugStr := string(requestDump)
+	if len(debugStr) > 100 {
+		debugStr = debugStr[:100]
+	}
+
+	logPrintf(cfg, "[ForceSave: %t] Try to get %s Request: [%s]", forceSave, urlStr, debugStr)
+}
+
 func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error {
 	requestDump, err := httputil.DumpRequest(req, true)
 	if err != nil {
@@ -41,7 +54,7 @@ func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error 
 	req.URL.Scheme = cfg.URL.Scheme
 	urlStr := req.URL.String()
 
-	logPrintf(cfg, "[ForceSave: %t] Try to get %s", cfg.ForceSave, urlStr)
+	logRequestPrintf(cfg, cfg.ForceSave, urlStr, requestDump)
 
 	fileName := fileKey(cfg, urlAsString(req.URL, cfg.NoUseDomain, cfg.NoUseUserData))
 	if !cfg.ForceSave {
