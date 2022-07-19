@@ -94,7 +94,7 @@ func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error 
 		return errors.Wrap(err, keyError)
 	}
 
-	cfg.Logger.Printf("save file: %s, key: %s", fileName, key)
+	cfg.Logger.Printf("save file: %s, key: %s, body: %d", fileName, key, len(body))
 	if err := cfg.Keeper.Save(fileName, key, body); err != nil {
 		return err
 	}
