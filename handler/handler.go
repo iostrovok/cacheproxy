@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/iostrovok/errors"
+
 	"github.com/iostrovok/cacheproxy/config"
 	"github.com/iostrovok/cacheproxy/store"
 )
@@ -27,14 +29,15 @@ func handler(cfg *config.Config, w http.ResponseWriter, req *http.Request) {
 }
 
 func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error {
+	keyError := "finger"
 	requestDump, err := httputil.DumpRequest(req, true)
 	if err != nil {
-		return err
+		return errors.Wrap(err, keyError)
 	}
 
 	key, err := cacheKey(cfg, req, requestDump)
 	if err != nil {
-		return err
+		return errors.Wrap(err, keyError)
 	}
 
 	req.URL.Host = cfg.URL.Host
@@ -48,13 +51,12 @@ func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error 
 		cfg.Logger.Printf("read file: %s, key: %s", fileName, key)
 		body, err := cfg.Keeper.Read(fileName, key)
 		if err != nil {
-			return err
+			return errors.Wrap(err, keyError)
 		}
 
 		// it means value is found in cache
-		if body != nil && len(body) > 0 {
-			item := &store.Item{}
-			if item, err = store.FromZip(body); err == nil {
+		if len(body) > 0 {
+			if item, err := store.FromZip(body); err == nil {
 				logPrintf(cfg, "Found at cache key: %s for %s", key, urlStr)
 				copyHeader(w.Header(), item.ResponseHeader)
 				w.WriteHeader(item.StatusCode)
@@ -65,7 +67,7 @@ func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error 
 				}
 			}
 
-			return err
+			return errors.Wrap(err, keyError)
 		}
 
 		logPrintf(cfg, "NOT Found at cache key: %s for %s", key, urlStr)
@@ -75,7 +77,7 @@ func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error 
 
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	if err != nil {
-		return err
+		return errors.Wrap(err, keyError)
 	}
 	defer resp.Body.Close()
 
@@ -89,7 +91,7 @@ func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error 
 
 	body, err := storeData.ToZip()
 	if err != nil {
-		return err
+		return errors.Wrap(err, keyError)
 	}
 
 	cfg.Logger.Printf("save file: %s, key: %s", fileName, key)
@@ -104,15 +106,14 @@ func finger(cfg *config.Config, w http.ResponseWriter, req *http.Request) error 
 	// return result
 	copyHeader(w.Header(), storeData.ResponseHeader)
 	w.WriteHeader(storeData.StatusCode)
-	w.Write(storeData.ResponseBody)
+	_, err = w.Write(storeData.ResponseBody)
 
-	return nil
+	return errors.Wrap(err, keyError)
 }
 
 func cloneUrl(in *url.URL) *url.URL {
 	var user *url.Userinfo
 	if in.User != nil {
-		user = &url.Userinfo{}
 		if p, find := in.User.Password(); find {
 			user = url.UserPassword(in.User.Username(), p)
 		} else {
@@ -173,7 +174,7 @@ func logPrintf(cfg *config.Config, tmpl string, data ...interface{}) {
 
 func streamToByte(stream io.Reader) []byte {
 	buf := new(bytes.Buffer)
-	buf.ReadFrom(stream)
+	_, _ = buf.ReadFrom(stream)
 	return buf.Bytes()
 }
 
