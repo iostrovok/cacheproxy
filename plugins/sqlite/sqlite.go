@@ -3,10 +3,12 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
+
+	"github.com/iostrovok/cacheproxy/cerrors"
 	"github.com/iostrovok/cacheproxy/config"
 	"github.com/iostrovok/cacheproxy/plugins"
 	"github.com/iostrovok/cacheproxy/sqlite"
@@ -24,11 +26,11 @@ func New(ctx context.Context, cfg *config.Config) plugins.IPlugin {
 }
 
 func (s *Sqlite) SetVersion(_ string) error {
-	return errors.New("sqlite plugin is not support version")
+	return errors.Wrap(cerrors.PluginHasNoVersion, "sqlite plugin")
 }
 
 func (s *Sqlite) PreloadByVersion() error {
-	return errors.New("sqlite plugin is not support version")
+	return errors.Wrap(cerrors.PluginHasNoVersion, "sqlite plugin")
 }
 
 func (s *Sqlite) Read(fileName, key string) ([]byte, error) {

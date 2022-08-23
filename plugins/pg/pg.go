@@ -8,7 +8,9 @@ import (
 	"sync"
 
 	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
 
+	"github.com/iostrovok/cacheproxy/cerrors"
 	"github.com/iostrovok/cacheproxy/plugins"
 )
 
@@ -80,6 +82,13 @@ func New(ctx context.Context, db *sql.DB, cfg *Config) (plugins.IPlugin, error) 
 }
 
 func (p *PG) SetVersion(version string) error {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.cfg.Version == "" {
+		return errors.Wrap(cerrors.EmptyVersion, "pg plugin")
+	}
+
 	p.cfg.Version = version
 
 	p.find = fmt.Sprintf(`
@@ -107,12 +116,16 @@ func (p *PG) SetVersion(version string) error {
 
 // PreloadByVersion loads all data for the version from DB and saves them to cache.
 func (p *PG) PreloadByVersion() error {
+	p.Lock()
+	defer p.Unlock()
+
 	if !p.cfg.UseCache || !p.cfg.UsePreload {
 		return nil
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	if p.cfg.Version == "" {
+		return errors.Wrap(cerrors.EmptyVersion, "pg plugin")
+	}
 
 	sql := fmt.Sprintf(`
 			SELECT %s, %s, %s FROM %s 
