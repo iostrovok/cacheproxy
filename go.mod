@@ -3,9 +3,9 @@ module github.com/iostrovok/cacheproxy
 go 1.17
 
 require (
-	github.com/iostrovok/check v0.0.13
-	github.com/lib/pq v1.10.4
-	github.com/mattn/go-sqlite3 v1.14.12
+	github.com/iostrovok/check v0.0.14
+	github.com/lib/pq v1.10.6
+	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/pkg/errors v0.9.1
 )
 
