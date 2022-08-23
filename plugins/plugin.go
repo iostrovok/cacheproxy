@@ -9,6 +9,9 @@ type IPlugin interface {
 
 	// SetVersion sets the version of the data being used. The GIT branch name is the first candidate.
 	SetVersion(version string) error
+
+	// PreloadByVersion loads data by 1 request
+	PreloadByVersion() error
 }
 
 // ILogger is simple interface to output filename and key.

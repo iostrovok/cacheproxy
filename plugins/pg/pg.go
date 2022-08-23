@@ -102,7 +102,7 @@ func (p *PG) SetVersion(version string) error {
 		p.cfg.FileCol, p.cfg.KeyCol, p.cfg.VersionCol,
 		p.cfg.ValCol, p.cfg.ValCol)
 
-	return p.PreloadByVersion()
+	return nil
 }
 
 // PreloadByVersion loads all data for the version from DB and saves them to cache.

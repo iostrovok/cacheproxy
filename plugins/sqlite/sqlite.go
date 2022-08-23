@@ -27,6 +27,10 @@ func (s *Sqlite) SetVersion(_ string) error {
 	return errors.New("sqlite plugin is not support version")
 }
 
+func (s *Sqlite) PreloadByVersion() error {
+	return errors.New("sqlite plugin is not support version")
+}
+
 func (s *Sqlite) Read(fileName, key string) ([]byte, error) {
 	store, err := sqlite.Select(s.fullFileName(fileName), key)
 	if err != nil && err == sql.ErrNoRows {
