@@ -16,6 +16,7 @@ import (
 
 type Sqlite struct {
 	storePath string
+	verbose   bool
 }
 
 func New(ctx context.Context, cfg *config.Config) plugins.IPlugin {
@@ -23,6 +24,11 @@ func New(ctx context.Context, cfg *config.Config) plugins.IPlugin {
 	return &Sqlite{
 		storePath: cfg.StorePath,
 	}
+}
+
+// VerboseMode sets up "verbose" mode
+func (s *Sqlite) VerboseMode(mode bool) {
+	s.verbose = mode
 }
 
 func (s *Sqlite) SetVersion(_ string) error {
