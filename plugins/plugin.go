@@ -12,6 +12,9 @@ type IPlugin interface {
 
 	// PreloadByVersion loads data by 1 request
 	PreloadByVersion() error
+
+	// VerboseMode sets up "verbose" mode
+	VerboseMode(bool)
 }
 
 // ILogger is simple interface to output filename and key.

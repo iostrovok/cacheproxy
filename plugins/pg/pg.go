@@ -67,6 +67,8 @@ type PG struct {
 	upsert string
 	find   string
 	cache  map[[16]byte]*cacheItem
+
+	verbose bool
 }
 
 func New(ctx context.Context, db *sql.DB, cfg *Config) (plugins.IPlugin, error) {
@@ -79,6 +81,11 @@ func New(ctx context.Context, db *sql.DB, cfg *Config) (plugins.IPlugin, error) 
 	err := out.SetVersion(cfg.Version)
 
 	return out, err
+}
+
+// VerboseMode sets up "verbose" mode
+func (s *PG) VerboseMode(mode bool) {
+	s.verbose = mode
 }
 
 func (p *PG) SetVersion(version string) error {
@@ -195,16 +202,27 @@ func (p *PG) shortFileName(fileName string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(fileName)))
 }
 
-func (p *PG) Read(fileName, key string) ([]byte, error) {
+func (p *PG) Read(fileName, key string) (out []byte, err error) {
 	fileName = p.shortFileName(fileName)
+	find := false
 
-	if out, find := p.readCache(fileName, key); find {
+	defer func() {
+		if p.verbose {
+			if err == nil && len(out) > 0 {
+				fmt.Printf("Found at cache key: %s, %s\n", fileName, key)
+			} else {
+				fmt.Printf("Not found at cache key: %s, %s\n", fileName, key)
+			}
+		}
+	}()
+
+	if out, find = p.readCache(fileName, key); find {
 		return out, nil
 	}
 
-	out := make([]byte, 0)
-	err := p.db.QueryRowContext(p.ctx, p.find, fileName, key).Scan(&out)
-	if err != nil && err == sql.ErrNoRows {
+	out = make([]byte, 0)
+	err = p.db.QueryRowContext(p.ctx, p.find, fileName, key).Scan(&out)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 
@@ -213,6 +231,10 @@ func (p *PG) Read(fileName, key string) ([]byte, error) {
 
 func (p *PG) Save(fileName, key string, data []byte) error {
 	fileName = p.shortFileName(fileName)
+
+	if p.verbose {
+		fmt.Printf("Save to cache: %s, %s\n", fileName, key)
+	}
 
 	if p.cfg.UseCache && p.findInCache(fileName, key, md5.Sum(data)) {
 		return nil

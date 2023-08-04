@@ -1,5 +1,6 @@
 CURDIR := $(shell pwd)
 DIR:=TEST_SOURCE_PATH=$(CURDIR)
+LIST_GO_TEST=`go list ./... | grep -v example/`
 
 
 ##
@@ -15,7 +16,7 @@ test-travis:
 test: clean
 	@echo "======================================================================"
 	@echo "Run race test for ./"
-	cd $(CURDIR)/ && go test -coverprofile=$(CURDIR)/coverage.main.out -race ./...
+	cd $(CURDIR)/ && go test $(LIST_GO_TEST) -coverprofile=$(CURDIR)/coverage.main.out -race ./...
 	go tool cover -html=$(CURDIR)/coverage.main.out -o $(CURDIR)/coverage.main.html
 	@rm -f $(CURDIR)/coverage.main.out
 	@rm -f  ./cassettes/*
